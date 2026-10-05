@@ -1,0 +1,14 @@
+keypairs
+target
+.anchor
+test-ledger
+**/node_modules
+**/.next
+**/.env
+**/.env.local
+**/.env.*
+!**/.env.example
+apps/keeper/data
+*.db
+*.db-journal
+*.log
