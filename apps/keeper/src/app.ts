@@ -16,6 +16,10 @@ import { PumpCreatorFeeClaimer } from './flywheel/creator-fees.js';
 import { FeeProcessor } from './flywheel/fees.js';
 import { Flywheel } from './flywheel/flywheel.js';
 import { GovernanceService } from './governance/actions.js';
+import { HolderGovernance } from './governance/holder-gov.js';
+import { buildHolderExclusions } from './flywheel/exclusions.js';
+import { GOV_JOB_MS, GOV_JOB_NAME, govJob } from './jobs/gov-job.js';
+import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { RefPriceUpdater } from './governance/ref-prices.js';
 import { ReconstitutionService } from './governance/reconstitution.js';
 import { HoldLpProvider, MeteoraLpProvider, type LpProvider } from './flywheel/lp.js';
@@ -54,6 +58,8 @@ export interface LiveContext {
   governance: GovernanceService;
   refPrices: RefPriceUpdater;
   reconstitution: ReconstitutionService;
+  /** Holder governance; null when disabled or COIN_MINT is unset. */
+  holderGov: HolderGovernance | null;
   scheduler: Scheduler;
   provider: LiveProvider;
   mints: RpcMintInfoSource;
@@ -102,12 +108,38 @@ export async function createLiveContext(overrides: Partial<Record<keyof Env, str
     log.warn('DEV_WALLET and/or COIN_MINT not set; flywheel disabled');
   }
 
+  let holderGov: HolderGovernance | null = null;
+  if (env.GOV_ENABLED && coinMint) {
+    const own = [keeper.publicKey.toBase58(), ...(devWallet ? [devWallet.publicKey.toBase58()] : [])];
+    let coinProgram: PublicKey | null = null;
+    holderGov = new HolderGovernance({
+      repo,
+      env,
+      events,
+      getSlot: () => chain.getCurrentSlot(),
+      getHolders: async () => (await sources.holders.getHolders(coinMint.toBase58())).map((h) => ({ owner: h.owner, amount: h.amount })),
+      exclusions: (owners) => buildHolderExclusions({ connection, env, own }, owners),
+      getBalance: async (wallet) => {
+        if (!coinProgram) {
+          const info = (await mints.getMintInfo([coinMint.toBase58()])).get(coinMint.toBase58());
+          coinProgram = info?.tokenProgram === TOKEN_2022_PROGRAM_ID.toBase58() ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+        }
+        return balances.getTokenBalance(new PublicKey(wallet), coinMint, coinProgram);
+      },
+      mints,
+      readAssets: () => chain.readAssets(),
+      reconstitution,
+    });
+  } else {
+    log.warn({ enabled: env.GOV_ENABLED, coinMint: Boolean(coinMint) }, 'holder governance disabled');
+  }
+
   const scheduler = new Scheduler();
-  const provider = new LiveProvider({ connection, chain, nav, market: sources.market, mints, repo, cfg, env, scheduler, governance, reconstitution, claimer, devWallet: devWallet?.publicKey });
+  const provider = new LiveProvider({ connection, chain, nav, market: sources.market, mints, repo, cfg, env, scheduler, governance, reconstitution, claimer, devWallet: devWallet?.publicKey, holderGov });
   log.info({ keeper: keeper.publicKey.toBase58(), dev: devWallet?.publicKey.toBase58() ?? null, indexMint: indexMint.toBase58(), dryRun: env.DRY_RUN }, 'live context ready');
 
   return {
-    env, cfg, connection, keeper, devWallet, chain, sources, repo, events, tx, devTx, nav, rebalancer, monitor, ap, flywheel, airdrop, fees, methodology, governance, refPrices, reconstitution, scheduler, provider, mints, balances,
+    env, cfg, connection, keeper, devWallet, chain, sources, repo, events, tx, devTx, nav, rebalancer, monitor, ap, flywheel, airdrop, fees, methodology, governance, refPrices, reconstitution, holderGov, scheduler, provider, mints, balances,
     close: () => db.close(),
   };
 }
@@ -138,6 +170,8 @@ export function registerJobs(ctx: LiveContext): void {
     await ctx.reconstitution.reconcileExecuted().catch(() => 0);
     return r;
   });
+  // Holder governance: close ended proposals, apply passed ones (kv overrides / timelocked reconstitution), reconcile.
+  if (ctx.holderGov) scheduler.addInterval(GOV_JOB_NAME, GOV_JOB_MS, govJob(ctx.holderGov));
   scheduler.addCron('methodology', env.METHODOLOGY_CRON, () => ctx.methodology.run());
   scheduler.addInterval('rebalance-check', env.REBALANCE_CHECK_SEC * 1000, () => ctx.rebalancer.check());
   scheduler.addInterval('auction-monitor', env.AUCTION_MONITOR_SEC * 1000, () => ctx.monitor.tick());

@@ -25,10 +25,15 @@ import type {
 import { nextScheduledRebalance } from '../methodology/schedule.js';
 import { createMockState, mockHoldings, tickMockState, type MockState } from './generator.js';
 import { MOCK_TOKENS } from './tokens.js';
+import { createMockGovernance } from './governance.js';
+import type { HolderGovernance } from '../governance/holder-gov.js';
+import type { GovApi } from '../api/types.js';
 
 export class MockProvider implements KeeperDataProvider {
   readonly mode = 'mock' as const;
   readonly state: MockState;
+  readonly holderGov: HolderGovernance;
+  readonly gov: GovApi;
   private timer: NodeJS.Timeout | undefined;
   private lastHistoryPush = Date.now();
 
@@ -37,6 +42,17 @@ export class MockProvider implements KeeperDataProvider {
     seed = 6900,
   ) {
     this.state = createMockState(seed);
+    const hg = createMockGovernance(this.state, events, seed);
+    this.holderGov = hg;
+    this.gov = {
+      summary: () => hg.summary(),
+      proposals: (status, wallet) => hg.list(status, wallet),
+      proposal: (id, wallet) => hg.get(id, wallet),
+      eligibility: (wallet) => hg.eligibility(wallet),
+      propose: (input, o) => hg.propose(input, o),
+      vote: (id, input) => hg.vote(id, input),
+      cancel: (id, note) => hg.cancel(id, note),
+    };
   }
 
   start(tickMs = 4_000): void {
@@ -49,6 +65,7 @@ export class MockProvider implements KeeperDataProvider {
   }
 
   private tick(): void {
+    void this.holderGov.tick().catch(() => undefined);
     const { changed } = tickMockState(this.state);
     void this.fund().then((f) => this.events.emit('fund', f));
     this.events.emit('holdings', mockHoldings(this.state));
@@ -216,6 +233,7 @@ export class MockProvider implements KeeperDataProvider {
       refMovePeriodSlots: '216000',
       reconstitutionMode: 'manual',
       currentSlot: '999000000',
+      governance: this.holderGov.summary(),
     };
   }
 

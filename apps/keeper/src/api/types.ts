@@ -205,6 +205,8 @@ export interface GovernanceDto {
   refMovePeriodSlots: string;
   reconstitutionMode: 'manual' | 'auto';
   currentSlot: string;
+  /** Holder governance summary (counts + parameters). */
+  governance?: GovSummaryDto;
 }
 
 export interface ProposalDto {
@@ -222,6 +224,23 @@ export interface ProposalDto {
   actionPda: string | null;
   queuedSig: string | null;
   note: string | null;
+}
+
+/**
+ * Holder governance (token-weighted, signature-based voting by $FIX6900 holders; docs/governance.md).
+ * DTOs live next to the service: governance/holder-gov.ts.
+ */
+export type { GovProposalDto, GovSummaryDto, GovEligibilityDto, GovTallyDto, GovVoteDto, ProposeInput } from '../governance/holder-gov.js';
+import type { GovProposalDto, GovSummaryDto, GovEligibilityDto, ProposeInput } from '../governance/holder-gov.js';
+
+export interface GovApi {
+  summary(): GovSummaryDto;
+  proposals(status?: string, wallet?: string): GovProposalDto[];
+  proposal(id: number, wallet?: string): GovProposalDto;
+  eligibility(wallet: string): Promise<GovEligibilityDto>;
+  propose(input: ProposeInput, opts?: { admin?: boolean }): Promise<GovProposalDto>;
+  vote(id: number, input: { wallet: string; choice: string; message: string; signature: string }): GovProposalDto;
+  cancel(id: number, note?: string): GovProposalDto;
 }
 
 /** Admin (ADMIN_TOKEN-protected) mutations; absent in mock mode. */
@@ -261,6 +280,8 @@ export interface KeeperDataProvider {
   governance(): Promise<GovernanceDto>;
   proposals(status?: string): Promise<ProposalDto[]>;
   readonly admin?: AdminActions;
+  /** Holder governance (GET/POST /v1/governance/*); absent when GOV_ENABLED=false. */
+  readonly gov?: GovApi;
   quoteCreate(units: bigint): Promise<QuoteCreateDto>;
   quoteRedeem(units: bigint): Promise<QuoteRedeemDto>;
   health(): Promise<Record<string, unknown>>;

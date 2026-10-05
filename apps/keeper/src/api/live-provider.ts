@@ -20,8 +20,11 @@ import { parseJson } from '../util/json.js';
 import { fromQ64 } from '../util/math.js';
 import { DAY } from '../util/time.js';
 import type { Scheduler } from '../jobs/scheduler.js';
+import type { HolderGovernance } from '../governance/holder-gov.js';
+import { withConfigOverrides } from '../config/overrides.js';
 import type {
   AdminActions,
+  GovApi,
   AirdropDto,
   AnnouncementDto,
   AuctionDto,
@@ -56,6 +59,8 @@ export interface LiveProviderDeps {
   /** Optional: live "unclaimed creator fees" for /v1/flywheel. */
   claimer?: CreatorFeeClaimer;
   devWallet?: PublicKey;
+  /** Holder governance service (null = disabled). */
+  holderGov?: HolderGovernance | null;
 }
 
 export function toProposalDto(p: ProposalRow): ProposalDto {
@@ -81,9 +86,22 @@ export class LiveProvider implements KeeperDataProvider {
   private readonly unclaimedCache = new TtlCache<{ bondingCurveSol: number; pumpSwapSol: number }>(30_000);
   readonly mode = 'live' as const;
   readonly admin: AdminActions;
+  readonly gov?: GovApi;
 
   constructor(private readonly d: LiveProviderDeps) {
     const recon = d.reconstitution;
+    const hg = d.holderGov;
+    if (hg) {
+      this.gov = {
+        summary: () => hg.summary(),
+        proposals: (status, wallet) => hg.list(status, wallet),
+        proposal: (id, wallet) => hg.get(id, wallet),
+        eligibility: (wallet) => hg.eligibility(wallet),
+        propose: (input, o) => hg.propose(input, o),
+        vote: (id, input) => hg.vote(id, input),
+        cancel: (id, note) => hg.cancel(id, note),
+      };
+    }
     this.admin = {
       approveProposal: async (mint, o) => {
         const r = await recon.approve(mint, o);
@@ -238,9 +256,10 @@ export class LiveProvider implements KeeperDataProvider {
 
   async methodology(): Promise<MethodologyDto> {
     const run = this.d.repo.latestMethodologyRun();
+    const cfg = withConfigOverrides(this.d.cfg, this.d.repo); // governance overrides (kv cfg.*) are the numbers in force
     return {
       // driftBandBps is a legacy alias (absolute band) the web still reads; the engine uses driftRelativeBps
-      config: { ...this.d.cfg, rebalance: { ...this.d.cfg.rebalance, driftBandBps: Math.round((this.d.cfg.rebalance.driftRelativeBps / 10_000) * (10_000 / Math.max(1, this.d.cfg.selection.targetCount))) } },
+      config: { ...cfg, rebalance: { ...cfg.rebalance, driftBandBps: Math.round((cfg.rebalance.driftRelativeBps / 10_000) * (10_000 / Math.max(1, cfg.selection.targetCount))) } },
       lastRun: run
         ? { ts: run.ts, eligible: parseJson<unknown[]>(run.eligible, []), selected: parseJson<unknown[]>(run.selected, []), weights: parseJson<unknown[]>(run.weights, []) }
         : null,
@@ -270,6 +289,7 @@ export class LiveProvider implements KeeperDataProvider {
       refMovePeriodSlots: fund.refMovePeriodSlots.toString(),
       reconstitutionMode: this.d.reconstitution.mode,
       currentSlot: slot.toString(),
+      ...(this.d.holderGov ? { governance: this.d.holderGov.summary() } : {}),
     };
   }
 

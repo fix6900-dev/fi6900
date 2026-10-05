@@ -137,7 +137,8 @@ export function quorumUnits(snapshotSupply: bigint, quorumBps: number): bigint {
 export function tallyOutcome(t: GovTally, snapshotSupply: bigint, quorumBps: number): TallyOutcome {
   const participation = t.for + t.against + t.abstain;
   const q = quorumUnits(snapshotSupply, quorumBps);
-  const quorumReached = participation >= q && (participation > 0n || q === 0n);
+  // With a positive quorum, a zero-supply snapshot (q = 0) can never reach it; quorumBps = 0 disables the rule.
+  const quorumReached = quorumBps <= 0 ? true : participation >= q && participation > 0n;
   const majority = t.for > t.against;
   return { ...t, participation, quorumUnits: q, quorumReached, majority, passed: quorumReached && majority };
 }
