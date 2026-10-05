@@ -1,4 +1,5 @@
 import type { Governance, Proposal } from "@/lib/schemas";
+import { mockGovSummary } from "@/lib/govMock";
 
 /** Demo fixtures for /admin when the keeper is unreachable. Mutations are refused in demo mode. */
 
@@ -33,6 +34,7 @@ export function mockGovernance(now = Date.now()): Governance {
     refMovePeriodSlots: "216000",
     reconstitutionMode: "manual",
     currentSlot: String(currentSlot),
+    governance: mockGovSummary(),
   };
 }
 

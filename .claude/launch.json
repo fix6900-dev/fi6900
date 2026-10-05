@@ -4,16 +4,42 @@
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@fi6900/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@fi6900/web",
+        "dev"
+      ],
       "port": 3000,
       "autoPort": true
     },
     {
       "name": "web-v2",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@fi6900/web-v2", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@fi6900/web-v2",
+        "dev"
+      ],
       "port": 3100,
       "autoPort": true
+    },
+    {
+      "name": "keeper-mock",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "apps/keeper/scripts/dev-mock.mjs"
+      ],
+      "port": 8787,
+      "url": "http://localhost:8787"
+    },
+    {
+      "name": "web-v2-local",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "apps/web-v2/scripts/dev-local.mjs"
+      ],
+      "port": 3100,
+      "url": "http://localhost:3100"
     }
   ]
 }

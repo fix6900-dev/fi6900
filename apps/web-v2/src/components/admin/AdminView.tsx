@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useAdminMutations, useDemoMode } from "@/lib/api";
 import { PageHeader } from "../ui/Card";
 import { GovernancePanel } from "./GovernancePanel";
+import { GovProposalsPanel } from "./GovProposalsPanel";
 import { ManualAssetForm } from "./ManualAssetForm";
 import { ProposalsPanel } from "./ProposalsPanel";
 import { ReconstitutionStatus } from "./ReconstitutionStatus";
@@ -47,6 +48,7 @@ export function AdminView() {
           <ManualAssetForm m={m} canMutate={canMutate} onLog={onLog} />
         </div>
         <ProposalsPanel m={m} canMutate={canMutate} onLog={onLog} />
+        <GovProposalsPanel getToken={getToken} canMutate={canMutate} />
         <GovernancePanel />
       </div>
     </div>

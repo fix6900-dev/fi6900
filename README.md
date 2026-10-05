@@ -5,6 +5,7 @@ An on-chain, equal-weight memecoin index fund on Solana that works the way SPY w
 - [Architecture](ARCHITECTURE.md): the contract between program, keeper and web.
 - [Tokenomics](docs/tokenomics.md): why buying the token gives you the basket, and what fees do.
 - [Methodology](docs/methodology.md): index rules, written like an index provider's document.
+- [Governance](docs/governance.md): token-weighted, signature-based (gasless) voting by `$FIX6900` holders on constituents and keeper parameters, binding through the keeper (site `/governance`).
 - [Operations](docs/operations.md) and [Launch runbook](docs/launch-runbook.md).
 
 ## Layout

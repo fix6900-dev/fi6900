@@ -12,7 +12,8 @@ export async function main(): Promise<() => Promise<void>> {
     const events = new EventBus();
     const provider = new MockProvider(events);
     provider.start();
-    const server = startServer(createApp({ provider, events, corsOrigin: env.CORS_ORIGIN }), env.PORT);
+    // ADMIN_TOKEN also works in mock mode so the admin console's governance cancel can be exercised locally.
+    const server = startServer(createApp({ provider, events, corsOrigin: env.CORS_ORIGIN, adminToken: env.ADMIN_TOKEN }), env.PORT);
     logger.info({ port: env.PORT }, 'keeper running in MOCK_MODE (no chain access)');
     return async () => {
       provider.stop();

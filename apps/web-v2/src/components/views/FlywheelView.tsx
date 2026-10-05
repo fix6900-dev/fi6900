@@ -30,6 +30,8 @@ const KIND: Record<EventKind, string> = {
   auction_start: "AUCTION",
   auction_fill: "FILL",
   fee_accrual: "FEE",
+  treasury: "TREASURY",
+  governance: "GOVERNANCE",
 };
 
 function fmtAmounts(a: Record<string, unknown>): string {
@@ -258,12 +260,12 @@ function EventRow({ e, now }: { e: FlywheelEvent; now: number }) {
       <span className="m muted feed-t" title={`${dateTime(e.ts)}`}>
         {relTime(e.ts, now)} · {new Date(e.ts).toISOString().slice(11, 19)}
       </span>
-      {e.sig ? (
+      {e.sig && e.sig !== "off-chain" && e.sig !== "dry-run" ? (
         <a className="lnk m" href={solscanTx(e.sig)} target="_blank" rel="noreferrer noopener">
           {truncateMiddle(e.sig, 5, 5)} ↗
         </a>
       ) : (
-        <span className="muted">—</span>
+        <span className="muted">{e.kind === "governance" ? "signed vote" : "—"}</span>
       )}
     </motion.div>
   );

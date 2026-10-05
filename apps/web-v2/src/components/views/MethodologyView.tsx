@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, type ReactNode } from "react";
-import { useAnnouncements, useFund, useMethodology, useProposals } from "@/lib/api";
+import { useAnnouncements, useFund, useGovernance, useMethodology, useProposals } from "@/lib/api";
+import { useGovProposals } from "@/lib/gov";
+import { units } from "../governance/GovBits";
 import { bpsToPct, compact, dateOnly, dateTime } from "@/lib/format";
 import { truncateMiddle } from "@/lib/utils";
 import { Countdown } from "../ui/Countdown";
@@ -22,6 +24,7 @@ const TOC = [
   ["reconstitution", "6", "Reconstitution schedule"],
   ["level", "7", "Index level formula"],
   ["committee", "8", "Committee process"],
+  ["governance", "9", "Holder governance"],
 ] as const;
 
 function Rule({ id, n: num, title, children, margin }: { id: string; n: string; title: string; children: ReactNode; margin?: [string, ReactNode][] }) {
@@ -53,6 +56,10 @@ export function MethodologyView() {
   const { data: ann } = useAnnouncements();
   const { data: proposals } = useProposals();
   const { data: fund } = useFund();
+  const { data: govInfo } = useGovernance();
+  const { data: govProposals } = useGovProposals();
+  const gov = govInfo?.governance;
+  const govOpen = (govProposals ?? []).filter((p) => p.status === "open");
   const cfg = data?.config;
   // Live constituent count from the fund account; the selection target below is the rule's parameter.
   const held = fund ? Number(fund.assetCount) : null;
@@ -134,6 +141,27 @@ export function MethodologyView() {
           <Rule id="committee" n="8" title="Committee process" margin={[["mode", mode], ["announce ahead", `${annAhead} h`]]}>
             <p>Additions and removals are proposed by the rules and approved by the index committee, monthly. Parameter changes are announced here with at least {annAhead} hours of notice. The methodology is versioned and material changes increment the version.</p>
           </Rule>
+          <Rule
+            id="governance"
+            n="9"
+            title="Holder governance"
+            margin={[
+              ["enabled", gov ? (gov.enabled ? "yes" : "no") : "—"],
+              ["voting window", gov ? `${gov.params.votingHours} h` : "—"],
+              ["quorum", gov ? `${gov.params.quorumBps} bps of circulating` : "—"],
+              ["proposal threshold", gov ? `${gov.params.proposalThresholdBps} bps` : "—"],
+              ["votable params", gov ? String(gov.params.allowedParams.length) : "—"],
+              ["open proposals", gov ? String(gov.counts.open) : "—"],
+            ]}
+          >
+            <p>
+              Holders of $FIX6900 vote directly on constituent additions and removals and on a whitelisted set of keeper parameters (24h volume floor, drift band, fee burn share, flywheel split), each within fixed bounds. A vote is a signed message, not a transaction. Weight is the wallet&apos;s balance at the proposal&apos;s snapshot slot; pools, program accounts, the burn address and the denylist are excluded from the snapshot and from circulating supply. A proposal passes when participation reaches the quorum and votes for exceed votes against. Passed constituent changes are queued through the on-chain timelock exactly like committee approvals; passed parameters take effect in the keeper at once and are shown in the margin of the rule they modify. The committee may cancel a proposal before it is executed. The full rules, message formats and limits are in{" "}
+              <a className="lnk" href="https://github.com/fix6900-dev/fi6900/blob/main/docs/governance.md" target="_blank" rel="noreferrer noopener">
+                docs/governance.md ↗
+              </a>
+              .
+            </p>
+          </Rule>
         </article>
 
         <aside className="doc-side" aria-label="Index status">
@@ -178,6 +206,38 @@ export function MethodologyView() {
                   </li>
                 ))}
               </ul>
+            )}
+          </section>
+          <section className="sidepanel">
+            <div className="micro muted">Holder governance</div>
+            {gov ? (
+              <>
+                <div className="side-v m">
+                  {gov.counts.open} open · {gov.counts.executed + gov.counts.queued} passed
+                </div>
+                <div className="faint">
+                  {gov.lastSnapshot ? `${units(gov.lastSnapshot.supply)} circulating at the last snapshot · ` : ""}
+                  {Object.keys(gov.overrides).length > 0 ? `${Object.keys(gov.overrides).length} parameter${Object.keys(gov.overrides).length === 1 ? "" : "s"} set by vote` : "no parameters overridden by vote"}
+                </div>
+                {govOpen.length > 0 && (
+                  <ul className="runlist">
+                    {govOpen.slice(0, 4).map((p) => (
+                      <li key={p.id}>
+                        <Link href={`/governance/${p.id}`} className="lnk">
+                          #{p.id} {p.title}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="faint">
+                  <Link href="/governance" className="lnk">
+                    Vote or propose →
+                  </Link>
+                </p>
+              </>
+            ) : (
+              <div className="faint">Not available on this keeper.</div>
             )}
           </section>
           <section className="sidepanel">

@@ -13,6 +13,7 @@
  */
 import { BaseSignerWalletAdapter, WalletReadyState, type WalletName, WalletNotConnectedError, type TransactionOrVersionedTransaction, type WalletError } from "@solana/wallet-adapter-base";
 import { Keypair, PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
+import nacl from "tweetnacl";
 import { env } from "./env";
 
 export const BurnerWalletName = "Devnet test wallet" as WalletName<"Devnet test wallet">;
@@ -155,6 +156,12 @@ export class BurnerWalletAdapter extends BaseSignerWalletAdapter {
     if (transaction instanceof VersionedTransaction) transaction.sign([this._keypair]);
     else if (transaction instanceof Transaction) transaction.partialSign(this._keypair);
     return transaction;
+  }
+
+  /** ed25519 detached signature over arbitrary bytes (governance votes and proposals sign canonical messages). */
+  async signMessage(message: Uint8Array): Promise<Uint8Array> {
+    if (!this._keypair) throw new WalletNotConnectedError();
+    return nacl.sign.detached(message, this._keypair.secretKey);
   }
 
   /** Exposes the secret so a user can copy it out (devnet only). */

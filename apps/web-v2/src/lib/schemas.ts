@@ -141,7 +141,7 @@ export const FlywheelSchema = z.object({
 });
 export type Flywheel = z.infer<typeof FlywheelSchema>;
 
-export const EventKind = z.enum(["claim", "buy_index", "add_lp", "airdrop", "buyback", "burn", "create", "redeem", "auction_start", "auction_fill", "fee_accrual"]);
+export const EventKind = z.enum(["claim", "buy_index", "add_lp", "airdrop", "buyback", "burn", "create", "redeem", "auction_start", "auction_fill", "fee_accrual", "treasury", "governance"]);
 export type EventKind = z.infer<typeof EventKind>;
 
 export const FlywheelEventSchema = z.object({
@@ -248,8 +248,101 @@ export const GovernanceSchema = z.object({
   refMovePeriodSlots: strish.optional(),
   reconstitutionMode: z.enum(["manual", "auto"]).optional(),
   currentSlot: strish,
+  /** Holder governance summary (GET /v1/governance.governance), absent when disabled. */
+  governance: z.lazy(() => GovSummarySchema).optional(),
 });
 export type Governance = z.infer<typeof GovernanceSchema>;
+
+/* ------------------------------------------------------------------ */
+/* Holder governance (ARCHITECTURE §5: /v1/governance/proposals,       */
+/* docs/governance.md)                                                  */
+/* ------------------------------------------------------------------ */
+
+export const GovKind = z.enum(["add_asset", "remove_asset", "set_param"]);
+export type GovKind = z.infer<typeof GovKind>;
+export const GovStatus = z.enum(["open", "passed", "failed", "queued", "executed", "cancelled"]);
+export type GovStatus = z.infer<typeof GovStatus>;
+export const GovChoice = z.enum(["for", "against", "abstain"]);
+export type GovChoice = z.infer<typeof GovChoice>;
+
+export const GovTallySchema = z.object({
+  for: strish,
+  against: strish,
+  abstain: strish,
+  participation: strish,
+  voters: numish,
+  quorumUnits: strish,
+  quorumReached: z.boolean(),
+  majority: z.boolean(),
+  passed: z.boolean(),
+  forBps: numish,
+  againstBps: numish,
+  abstainBps: numish,
+  participationBps: numish,
+});
+export type GovTally = z.infer<typeof GovTallySchema>;
+
+export const GovVoteSchema = z.object({ wallet: z.string(), choice: GovChoice, weight: strish, ts: z.string() });
+export type GovVote = z.infer<typeof GovVoteSchema>;
+
+export const GovProposalSchema = z.object({
+  id: numish,
+  kind: GovKind,
+  payload: z.record(z.unknown()).default({}),
+  summary: z.string(),
+  title: z.string(),
+  description: z.string().default(""),
+  proposer: z.string(),
+  createdTs: z.string(),
+  snapshotSlot: strish,
+  snapshotSupply: strish,
+  snapshotHolders: numish,
+  startTs: z.string(),
+  endTs: z.string(),
+  quorumBps: numish,
+  status: GovStatus,
+  timeLeftSec: numish,
+  tally: GovTallySchema,
+  result: z.record(z.unknown()).nullable().optional(),
+  queuedActionPda: z.string().nullable().optional(),
+  queuedSig: z.string().nullable().optional(),
+  myVote: GovVoteSchema.nullable().optional(),
+  myWeight: strish.optional(),
+  votes: z.array(GovVoteSchema).optional(),
+});
+export type GovProposal = z.infer<typeof GovProposalSchema>;
+export const GovProposalsSchema = z.array(GovProposalSchema);
+
+export const GovParamSpecSchema = z.object({ key: z.string(), label: z.string(), unit: z.string(), min: numish, max: numish, integer: z.boolean(), applies: z.string() });
+export type GovParamSpec = z.infer<typeof GovParamSpecSchema>;
+
+export const GovSummarySchema = z.object({
+  enabled: z.boolean(),
+  coinMint: z.string().nullable().optional(),
+  counts: z.object({ open: numish, passed: numish, failed: numish, queued: numish, executed: numish, cancelled: numish }),
+  params: z.object({
+    votingHours: numish,
+    quorumBps: numish,
+    proposalThresholdBps: numish,
+    maxOpenPerWallet: numish,
+    allowedParams: z.array(GovParamSpecSchema).default([]),
+    devAcceptAnyBalance: z.boolean().optional(),
+  }),
+  overrides: z.record(numish).default({}),
+  lastSnapshot: z.object({ proposalId: numish, slot: strish, supply: strish, holders: numish }).nullable().optional(),
+});
+export type GovSummary = z.infer<typeof GovSummarySchema>;
+
+export const GovEligibilitySchema = z.object({
+  wallet: z.string(),
+  balance: strish,
+  circulatingSupply: strish,
+  thresholdUnits: strish,
+  eligible: z.boolean(),
+  openProposals: numish,
+  maxOpenPerWallet: numish,
+});
+export type GovEligibility = z.infer<typeof GovEligibilitySchema>;
 
 export const ProposalStatus = z.enum(["proposed", "approved", "rejected", "queued", "executed"]);
 export type ProposalStatus = z.infer<typeof ProposalStatus>;

@@ -263,6 +263,7 @@ Cadence:
 - Reconstitution (add/remove constituents) on the 1st of each month, 00:00 UTC, announced 48h ahead via API `announcements`. The methodology job never applies changes itself: it records **proposals**; in `reconstitution.mode = manual` (default) the index committee approves/rejects them (CLI `keeper approve|reject`, `POST /v1/admin/...`), in `auto` they are approved automatically. Approved items are queued as timelocked `PendingAction`s at the window (or at once with `--immediate`) and execute after the timelock. Rejections suppress re-proposal for `reconstitution.rejectCooldownDays` (default 90).
 
 Index level (divisor method, like S&P):
+- **Holder governance (v1, `docs/governance.md`).** `$FIX6900` holders vote on `add_asset` / `remove_asset` and on a whitelisted set of parameters (`eligibility.minVolume24hUsd` 50k..2M, `rebalance.driftRelativeBps` 1000..10000, `FEE_BURN_PCT` 0..100, `flywheel.airdropShareBps` 0..10000). A vote is an ed25519-signed message (gasless), weighted by the wallet's balance at the proposal's snapshot slot; the snapshot drops the airdrop exclusion set (pools, PDAs, program accounts, incinerator, denylist, own wallets) and its sum is the circulating supply. Window 48 h, quorum 5 % of circulating (for+against+abstain), passes when for > against; proposing needs 0.5 % of circulating. The `governance` job (60 s) closes ended proposals; a passed add/remove becomes an approved reconstitution proposal queued through the timelock (status `queued` → `executed` via `reconcileExecuted`), a passed parameter is written to the kv store as `cfg.<key>` and read by the methodology job, rebalancer, fee processor and flywheel at the point of use (`config/overrides.ts`; `GET /v1/methodology` reports the effective config). Every step is a `flywheel_events` row of kind `governance`.
 ```
 level_t = Σ_i price_i,t × effective_balance_i,t / divisor_t
 divisor_0 = Σ price × balance / 1000      (base level 1000 at inception)
@@ -327,7 +328,22 @@ POST /v1/admin/proposals/:mint/reject    body { note? }
 POST /v1/admin/assets                    body { mint, action?: 'add'|'remove', weightBps?, immediate?, force? }
 ```
 
+
+GET  /v1/governance/proposals?status=&wallet=   [{ id, kind:'add_asset'|'remove_asset'|'set_param', payload, summary, title, description, proposer, createdTs, snapshotSlot, snapshotSupply,
+                                                  snapshotHolders, startTs, endTs, quorumBps, status:'open'|'passed'|'failed'|'queued'|'executed'|'cancelled', timeLeftSec,
+                                                  tally:{ for, against, abstain, participation, voters, quorumUnits, quorumReached, majority, passed, forBps, againstBps, abstainBps, participationBps },
+                                                  result, queuedActionPda, queuedSig, myVote?, myWeight? }]      // open first; ?wallet adds myVote / myWeight
+GET  /v1/governance/proposals/:id?wallet=       GovProposal + votes:[{ wallet, choice, weight, ts }]
+GET  /v1/governance/eligibility?wallet=         { wallet, balance, circulatingSupply, thresholdUnits, eligible, openProposals, maxOpenPerWallet }
+POST /v1/governance/proposals                   body { kind, payload, title, description, proposer, message, signature } -> 201 GovProposal
+                                                // message = `FIX6900 governance: propose <sha256 of canonical JSON {kind,payload,title,description,proposer}>`, ed25519 by proposer;
+                                                // Authorization: Bearer ADMIN_TOKEN creates without signature / threshold (proposer 'admin')
+POST /v1/governance/proposals/:id/vote          body { wallet, choice:'for'|'against'|'abstain', message, signature } -> GovProposal
+                                                // message = `FIX6900 governance: vote <choice> on proposal <id> (snapshot slot <slot>)`; weight = snapshot balance; re-vote replaces
+POST /v1/admin/governance/proposals/:id/cancel  body { note? }     // ADMIN_TOKEN; open or passed only
 `upgradeAuthority` / `programDataAddress` are read from the BPF upgradeable loader: the program account points at its ProgramData account, whose `Option<Pubkey>` upgrade authority is `null` once burned.
+
+Holder-governance POSTs are rate-limited (20 per minute per IP + wallet, 429) and answer 400 (validation / message mismatch), 403 (bad signature, below threshold, no snapshot balance), 404, 409 (closed, duplicate, already a constituent) or 503 (`GOV_ENABLED=false` or no `COIN_MINT`). `GET /v1/governance` carries a `governance` block: `{ enabled, coinMint, counts:{open,passed,failed,queued,executed,cancelled}, params:{ votingHours, quorumBps, proposalThresholdBps, maxOpenPerWallet, allowedParams:[{key,label,unit,min,max,integer,applies}], devAcceptAnyBalance }, overrides:{ '<key>': value }, lastSnapshot:{ proposalId, slot, supply, holders } | null }`. `flywheel/events` gains kinds `treasury` and `governance` (sig `off-chain` until a queue transaction exists). Full rules and message formats: `docs/governance.md`.
 
 SSE: `GET /v1/stream` emits `fund`, `holdings`, `auction`, `flywheel_event` messages.
 
