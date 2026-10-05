@@ -1,6 +1,6 @@
 /** Authorized-participant loop: close NAV <-> market gaps with Jupiter + in-kind create/redeem. */
 import type { ChainClient } from '../chain/types.js';
-import { DRY_RUN_SIG, type TxSender } from '../chain/tx.js';
+import { DRY_RUN_SIG, sendSession, sessionNonce, type TxSender } from '../chain/tx.js';
 import type { Env } from '../config/env.js';
 import type { Repo } from '../db/repo.js';
 import type { BalanceSource } from '../chain/accounts.js';
@@ -153,8 +153,8 @@ export class ApArbitrageur {
       const tx = await this.d.quotes.swapTx(q, payer);
       sigs.push(await this.d.tx.sendVersioned(tx, { label: `ap buy ${leg.mint}` }));
     }
-    const mintTxs = await this.d.chain.buildMintTxs(units, this.d.tx.payer);
-    sigs.push(...(await this.d.tx.sendMany(mintTxs, { label: 'ap mint' })));
+    const mintNonce = sessionNonce();
+    sigs.push(...(await sendSession(this.d.tx, () => this.d.chain.buildMintTxs(units, this.d.tx.payer, { nonce: mintNonce }), { label: 'ap mint' })));
     const fund = await this.d.chain.readFund();
     const netUnits = units - (units * BigInt(fund.mintFeeBps)) / 10_000n;
     const sellQ = await this.d.quotes.quote({ inputMint: this.d.chain.indexMint.toBase58(), outputMint: WSOL_MINT, amount: netUnits, slippageBps: this.d.env.AP_SLIPPAGE_BPS });
@@ -176,8 +176,8 @@ export class ApArbitrageur {
     const buyQ = await this.d.quotes.quote({ inputMint: WSOL_MINT, outputMint: this.d.chain.indexMint.toBase58(), amount: uiToBigint(this.d.env.AP_NOTIONAL_SOL, 9), slippageBps: this.d.env.AP_SLIPPAGE_BPS, maxAccounts: 40 });
     sigs.push(await this.d.tx.sendVersioned(await this.d.quotes.swapTx(buyQ, payer), { label: 'ap buy units' }));
     units = buyQ.outAmount;
-    const redeemTxs = await this.d.chain.buildRedeemTxs(units, this.d.tx.payer);
-    sigs.push(...(await this.d.tx.sendMany(redeemTxs, { label: 'ap redeem' })));
+    const redeemNonce = sessionNonce();
+    sigs.push(...(await sendSession(this.d.tx, () => this.d.chain.buildRedeemTxs(units, this.d.tx.payer, { nonce: redeemNonce }), { label: 'ap redeem' })));
     let solReceived = 0n;
     for (const leg of redemptionBasket(assets, units, supply, redeemFeeBps)) {
       if (leg.amount === 0n) continue;

@@ -23,6 +23,8 @@ export enum ActionKind {
   AddAsset = 7,
   BeginRemoveAsset = 8,
   SetRefMovePolicy = 9,
+  /** key = sha256 commitment to (name, symbol, uri); executed by `set_token_metadata` */
+  SetTokenMetadata = 10,
 }
 
 export const ACTION_KIND_NAMES: Record<number, string> = {
@@ -36,6 +38,7 @@ export const ACTION_KIND_NAMES: Record<number, string> = {
   7: 'add_asset',
   8: 'begin_remove_asset',
   9: 'set_ref_move_policy',
+  10: 'set_token_metadata',
 };
 
 export interface FundState {
@@ -194,8 +197,8 @@ export interface ChainClient {
   getProgramUpgradeInfo(): Promise<ProgramUpgradeInfo>;
 
   /** Ordered transactions for in-kind creation/redemption (unsigned, owner = payer). */
-  buildMintTxs(units: bigint, owner: PublicKey): Promise<VersionedTransaction[]>;
-  buildRedeemTxs(units: bigint, owner: PublicKey): Promise<VersionedTransaction[]>;
+  buildMintTxs(units: bigint, owner: PublicKey, opts?: { nonce?: bigint }): Promise<VersionedTransaction[]>;
+  buildRedeemTxs(units: bigint, owner: PublicKey, opts?: { nonce?: bigint }): Promise<VersionedTransaction[]>;
 
   startAuction(p: StartAuctionParams, rebalancer: PublicKey): Promise<StartAuctionResult>;
   /**
@@ -227,6 +230,23 @@ export interface ChainClient {
   beginRemoveAssetIx(mint: PublicKey, authority: PublicKey): Promise<TransactionInstruction[]>;
   bootstrapMintIx(units: bigint, authority: PublicKey): Promise<TransactionInstruction[]>;
   createFundLookupTable(payer: PublicKey): Promise<LookupTableCreation>;
+
+  // token metadata (Metaplex) of the index mint
+  readTokenMetadata(): Promise<TokenMetadataState | null>;
+  /** Direct while timelock == 0; with the timelock armed pass the due SetTokenMetadata action PDA. */
+  setTokenMetadataIx(args: { name: string; symbol: string; uri: string }, authority: PublicKey, actionPda?: PublicKey | null): Promise<TransactionInstruction[]>;
+  /** `key` for a queued SetTokenMetadata action (sha256 commitment to the payload). */
+  tokenMetadataHash(args: { name: string; symbol: string; uri: string }): Promise<string>;
+}
+
+export interface TokenMetadataState {
+  address: string;
+  updateAuthority: string;
+  mint: string;
+  name: string;
+  symbol: string;
+  uri: string;
+  isMutable: boolean;
 }
 
 export interface MintInfo {

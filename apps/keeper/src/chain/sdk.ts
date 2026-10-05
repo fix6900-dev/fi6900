@@ -35,6 +35,7 @@ import {
   type QueueActionResult,
   type StartAuctionParams,
   type StartAuctionResult,
+  type TokenMetadataState,
 } from './types.js';
 
 const log = childLogger('chain.sdk');
@@ -273,12 +274,12 @@ export class SdkChainClient implements ChainClient {
     return readProgramUpgradeInfo(this.connection, this.client.programId);
   }
 
-  async buildMintTxs(units: bigint, owner: PublicKey): Promise<VersionedTransaction[]> {
-    return this.client.buildMintTxs(owner, units, { lookupTables: this.lookupTables });
+  async buildMintTxs(units: bigint, owner: PublicKey, opts: { nonce?: bigint } = {}): Promise<VersionedTransaction[]> {
+    return this.client.buildMintTxs(owner, units, { lookupTables: this.lookupTables, nonce: opts.nonce });
   }
 
-  async buildRedeemTxs(units: bigint, owner: PublicKey): Promise<VersionedTransaction[]> {
-    return this.client.buildRedeemTxs(owner, units, { lookupTables: this.lookupTables });
+  async buildRedeemTxs(units: bigint, owner: PublicKey, opts: { nonce?: bigint } = {}): Promise<VersionedTransaction[]> {
+    return this.client.buildRedeemTxs(owner, units, { lookupTables: this.lookupTables, nonce: opts.nonce });
   }
 
   private async findRawAsset(mint: PublicKey): Promise<AssetAccount> {
@@ -389,5 +390,31 @@ export class SdkChainClient implements ChainClient {
   async createFundLookupTable(payer: PublicKey): Promise<LookupTableCreation> {
     const plan = await this.client.createFundLookupTable(payer, payer);
     return { address: plan.lookupTable, lookupTables: plan.lookupTables, instructionGroups: plan.instructionGroups, addresses: plan.addresses.length };
+  }
+
+  // ---------- token metadata ----------
+
+  async readTokenMetadata(): Promise<TokenMetadataState | null> {
+    const m = await this.client.readTokenMetadata();
+    if (!m) return null;
+    return {
+      address: m.address.toBase58(),
+      updateAuthority: m.updateAuthority.toBase58(),
+      mint: m.mint.toBase58(),
+      name: m.name,
+      symbol: m.symbol,
+      uri: m.uri,
+      isMutable: m.isMutable,
+    };
+  }
+
+  async setTokenMetadataIx(args: { name: string; symbol: string; uri: string }, authority: PublicKey, actionPda?: PublicKey | null): Promise<TransactionInstruction[]> {
+    const action = actionPda ? await this.client.readPendingAction(actionPda) : null;
+    if (actionPda && !action) throw new Error(`pending action ${actionPda.toBase58()} not found (already executed or cancelled)`);
+    return [await this.client.setTokenMetadataIx(authority, args, action)];
+  }
+
+  async tokenMetadataHash(args: { name: string; symbol: string; uri: string }): Promise<string> {
+    return (await this.sdk.tokenMetadataHash(args)).toBase58();
   }
 }

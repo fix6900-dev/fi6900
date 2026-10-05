@@ -38,6 +38,33 @@ export interface TxSender {
   simulate(ixs: TransactionInstruction[], opts?: SendOptions): Promise<{ ok: boolean; logs: string[]; err?: string }>;
 }
 
+/** A session nonce for mint/redeem sessions (unique per run; fits the program's u64). */
+export function sessionNonce(): bigint {
+  return BigInt(Date.now()) * 1000n + BigInt(Math.floor(Math.random() * 1000));
+}
+
+/**
+ * Sends an ordered multi-transaction session (begin → deposits/withdraws → finalize/close) one step at a time,
+ * rebuilding the whole list before every step so each transaction carries a fresh blockhash. A pre-built list
+ * shares one blockhash and the later steps expire while the earlier ones confirm on a busy network.
+ */
+export async function sendSession(
+  tx: TxSender,
+  build: () => Promise<VersionedTransaction[]>,
+  opts: SendOptions = {},
+): Promise<string[]> {
+  const sigs: string[] = [];
+  const first = await build();
+  const n = first.length;
+  for (let i = 0; i < n; i++) {
+    const txs = i === 0 ? first : await build();
+    const step = txs[i];
+    if (!step) throw new Error(`session rebuild returned ${txs.length} txs, expected ${n}`);
+    sigs.push(await tx.sendVersioned(step, { ...opts, label: `${opts.label ?? 'session'} ${i + 1}/${n}` }));
+  }
+  return sigs;
+}
+
 export class TxExpiredError extends Error {
   constructor(readonly sig: string) {
     super(`Signature ${sig} expired: block height exceeded`);

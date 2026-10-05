@@ -10,7 +10,7 @@ import type { MintInfoSource } from '../chain/accounts.js';
 import { SystemProgram } from '@solana/web3.js';
 import type { BalanceSource } from '../chain/accounts.js';
 import type { ChainClient } from '../chain/types.js';
-import { DRY_RUN_SIG, type TxSender } from '../chain/tx.js';
+import { DRY_RUN_SIG, sendSession, sessionNonce, type TxSender } from '../chain/tx.js';
 import type { Env } from '../config/env.js';
 import { airdropShareBps } from '../config/overrides.js';
 import type { Repo } from '../db/repo.js';
@@ -290,8 +290,8 @@ export class Flywheel {
         await buyLeg(leg.mint, ((leg.amount - have) * 110n) / 100n, `flywheel top-up ${leg.mint}`);
       }
     }
-    const txs = await this.d.chain.buildMintTxs(units, this.d.devWallet);
-    sigs.push(...(await this.d.devTx.sendMany(txs, { label: 'flywheel mint' })));
+    const nonce = sessionNonce();
+    sigs.push(...(await sendSession(this.d.devTx, () => this.d.chain.buildMintTxs(units, this.d.devWallet, { nonce }), { label: 'flywheel mint' })));
     if (toPool) this.d.airdrop.addToPool(netUnits);
     this.d.repo.insertFlywheelEvent({ kind: 'create', sig: sigs[sigs.length - 1] ?? DRY_RUN_SIG, amounts: { units, netUnits, sol: Number(lamports) / 1e9, legs: sigs, source }, note: `${source} leg: basket bought and units created in-kind` });
     this.d.events.emit('flywheel_event', { kind: 'create', units: netUnits.toString() });
