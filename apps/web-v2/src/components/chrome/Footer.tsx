@@ -81,7 +81,7 @@ export function Footer() {
                 {verify ? authority ? <Address value={authority} copy={false} /> : "burned" : "—"}
                 {verify && authority ? (
                   <>
-                    . Held by the developer at launch; scheduled to move to a Realms DAO governed by $FI holders (
+                    . Held by the developer at launch; scheduled to move to a Realms DAO governed by $FIX6900 holders (
                     <a className="lnk" href={`${REPO}/blob/main/docs/mainnet-go-live.md`} target="_blank" rel="noreferrer noopener">
                       plan ↗
                     </a>
@@ -95,7 +95,7 @@ export function Footer() {
             <h2 id="ft-notes" className="micro ft-h">
               Notes
             </h2>
-            <p className="prose-sm">$FI6900 is redeemable in-kind for a pro-rata share of the vault. $FI is the governance and fee token. Nothing on this site is a promise of returns.</p>
+            <p className="prose-sm">$FI6900 is redeemable in-kind for a pro-rata share of the vault. $FIX6900 is the governance and fee token. Nothing on this site is a promise of returns.</p>
           </section>
         </div>
       </div>

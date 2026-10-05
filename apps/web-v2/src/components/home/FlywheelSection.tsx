@@ -18,7 +18,7 @@ export function FlywheelSection() {
   return (
     <section className="sec" aria-labelledby="fw-h">
       <SectionHead n={5} title={<span id="fw-h">Flywheel</span>} right={<Link href="/flywheel" className="lnk">Flywheel detail →</Link>} />
-      <p className="sec-lede">Two tokens. $FI creator fees fund the index; the index&apos;s own fees buy back and burn $FI.</p>
+      <p className="sec-lede">Two tokens. $FIX6900 creator fees fund the index; the index&apos;s own fees buy back and burn $FIX6900.</p>
       <div className="fw-grid">
         <FeeLoop data={data} flows={flows} />
         <dl className="counters">
@@ -41,14 +41,14 @@ export function FlywheelSection() {
             </dd>
           </div>
           <div>
-            <dt className="micro muted">$FI burned</dt>
+            <dt className="micro muted">$FIX6900 burned</dt>
             <dd>
-              <Figure value={data?.burnedCoin} format={(n) => compact(n, 2)} /> <span className="unit">$FI</span>
+              <Figure value={data?.burnedCoin} format={(n) => compact(n, 2)} /> <span className="unit">$FIX6900</span>
             </dd>
           </div>
         </dl>
       </div>
-      {idle && <p className="faint idle-note">Counters start when $FI launches. Coin mint not set on devnet.</p>}
+      {idle && <p className="faint idle-note">Counters start when $FIX6900 launches. Coin mint not set on devnet.</p>}
       <Notes notes={[{ label: "Counters are keeper totals taken from its flywheel ledger; every event behind them has a transaction signature on Flywheel", source: "keeper snapshot" }]} />
     </section>
   );

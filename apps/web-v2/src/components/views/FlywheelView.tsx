@@ -45,7 +45,7 @@ function fmtAmounts(a: Record<string, unknown>): string {
     const raw = k === "units" && Math.abs(n) > 1e6; // raw 6-decimal units from the keeper
     const val = raw ? n / 1e6 : n;
     const s = Math.abs(val) >= 1000 ? compact(val, 2) : num(val, val < 1 ? 4 : 2);
-    const unit = k === "sol" ? "SOL" : k === "units" ? "units" : k === "coin" ? "$FI" : k.replace(/([A-Z])/g, " $1").toLowerCase();
+    const unit = k === "sol" ? "SOL" : k === "units" ? "units" : k === "coin" ? "$FIX6900" : k.replace(/([A-Z])/g, " $1").toLowerCase();
     parts.push(`${s} ${unit}`);
   }
   return parts.join(" · ");
@@ -59,19 +59,19 @@ export function FlywheelView() {
   const notes: Note[] = [
     { label: "Creator fees claimed by the keeper from pump.fun and PumpSwap", source: "keeper ledger, tx signatures in the event feed" },
     { label: "Liquidity added to the FI6900/SOL pool", source: "keeper ledger" },
-    { label: "FI6900 units minted from fee SOL and airdropped to $FI holders", source: "keeper ledger" },
-    { label: "$FI bought with 75% of index fees and burned", source: "keeper ledger" },
+    { label: "FI6900 units minted from fee SOL and airdropped to $FIX6900 holders", source: "keeper ledger" },
+    { label: "$FIX6900 bought with 75% of index fees and burned", source: "keeper ledger" },
   ];
 
   return (
     <div className="page pagebody">
-      <PageHeader eyebrow="Flywheel" title="The coin funds the index. The index burns the coin." desc="$FI creator fees are split. Half becomes permanent FI6900/SOL liquidity. Half buys the basket, mints units and airdrops them to $FI holders every 15 minutes. 75% of the index's own fees buy back and burn $FI." />
+      <PageHeader eyebrow="Flywheel" title="The coin funds the index. The index burns the coin." desc="$FIX6900 creator fees are split. Half becomes permanent FI6900/SOL liquidity. Half buys the basket, mints units and airdrops them to $FIX6900 holders every 15 minutes. 75% of the index's own fees buy back and burn $FIX6900." />
 
       <section className="sec" aria-label="Fee flow">
         <div className="fw-big">
           <FeeLoop data={data} flows={flows} />
         </div>
-        {data && !data.coinMint && <p className="faint idle-note">Counters start when $FI launches. Coin mint not set on devnet.</p>}
+        {data && !data.coinMint && <p className="faint idle-note">Counters start when $FIX6900 launches. Coin mint not set on devnet.</p>}
       </section>
 
       <dl className="strip5">
@@ -99,9 +99,9 @@ export function FlywheelView() {
           <dd className="faint">{data ? `${data.airdropRounds.toLocaleString()} rounds` : ""}</dd>
         </div>
         <div>
-          <dt className="micro muted">$FI burned</dt>
+          <dt className="micro muted">$FIX6900 burned</dt>
           <dd>
-            <Figure value={data?.burnedCoin} format={(n) => compact(n, 2)} /> <span className="unit">$FI</span>
+            <Figure value={data?.burnedCoin} format={(n) => compact(n, 2)} /> <span className="unit">$FIX6900</span>
             {data && <Fn n={4} note={notes[3]} />}
           </dd>
           <dd className="faint">{data ? `${num(data.buybackSol, 2)} SOL of buybacks` : ""}</dd>

@@ -2,7 +2,7 @@
  * Flywheel orchestrator (ARCHITECTURE.md section 4), run every DIST_INTERVAL by the dev wallet:
  *
  *   claim creator fees ->  50% LP leg   : 25% buys $FI6900 on Jupiter, paired with 25% SOL -> Meteora
- *                      ->  50% airdrop  : buy basket -> create units -> pro-rata airdrop to $FI holders
+ *                      ->  50% airdrop  : buy basket -> create units -> pro-rata airdrop to $FIX6900 holders
  */
 import type { PublicKey } from '@solana/web3.js';
 import type { ChainClient } from '../chain/types.js';

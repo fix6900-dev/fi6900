@@ -42,7 +42,7 @@ METEORA_POOL=                      # filled by §4
 TREASURY_WALLET=<pubkey receiving the 25 % treasury share>
 ```
 
-## 1. 🔑💰 Create the $FI coin on pump.fun (dev wallet)
+## 1. 🔑💰 Create the $FIX6900 coin on pump.fun (dev wallet)
 
 Manual, in the browser, **signing with the dev wallet** (the creator receives the creator fees the flywheel claims).
 Name / ticker `FI6900 Coin` / `FI`. Then:
@@ -258,11 +258,11 @@ Rules for a fix once a fund exists:
 - Upgrade when `open_auctions == 0` and no mint/redeem session is open (check `/v1/auctions?status=open`; sessions are visible with `getProgramAccounts` on the session discriminators), so no in-flight flow straddles two program versions.
 - If the .so grew, `solana program extend` first (rent for the extra bytes); the deployer needs the buffer rent (~3.5 SOL for 690 KB) up front, which the upgrade refunds.
 
-## 8b. 🔑 Later (week 2+): `$FI` as the voting token via Realms
+## 8b. 🔑 Later (week 2+): `$FIX6900` as the voting token via Realms
 
-Do this only once `$FI` has enough holders for a vote to mean something. Nothing in the program changes; the fund authority simply becomes a DAO governance account instead of the Squads vault.
+Do this only once `$FIX6900` has enough holders for a vote to mean something. Nothing in the program changes; the fund authority simply becomes a DAO governance account instead of the Squads vault.
 
-1. **Create the DAO** at https://app.realms.today → Create DAO → "Multi-sig / Community token" → community token = the `$FI` mint (`COIN_MINT`). Settings to start with:
+1. **Create the DAO** at https://app.realms.today → Create DAO → "Multi-sig / Community token" → community token = the `$FIX6900` mint (`COIN_MINT`). Settings to start with:
    - Voting: one token = one vote; voting period 3 days; approval quorum 20% of deposited supply; proposal threshold 0.5% of supply (raise later).
    - Council: your Squads signers as the council, with veto on community proposals. Keep this for the first months.
    - Realms creates a **governance account** (a PDA). That pubkey is the new fund authority.

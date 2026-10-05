@@ -7,7 +7,7 @@
  *   keeper methodology [--dry]                  one methodology pass
  *   keeper rebalance [--dry] [--force]          one rebalance check (plan + open auctions)
  *   keeper airdrop [--dry]                      one flywheel cycle (claim -> LP -> create -> airdrop)
- *   keeper snapshot-holders [--mint <mint>]     holder snapshot of the $FI coin into SQLite
+ *   keeper snapshot-holders [--mint <mint>]     holder snapshot of the $FIX6900 coin into SQLite
  *   keeper fees [--dry]                         one fee-processing pass
  *   keeper proposals [--status s]               reconstitution proposals (index committee queue)
  *   keeper approve <mint> [--weight bps] [--immediate]   approve a proposal (queued at the next window, or now)

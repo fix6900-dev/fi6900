@@ -5,7 +5,7 @@ Two tokens, one flywheel:
 | Token | Type | Role |
 |---|---|---|
 | **FI6900 Index** (`$FI6900`) | SPL mint, authority = program PDA | The ETF. Every unit is redeemable in-kind for a pro-rata slice of the vault. |
-| **FI6900 Coin** (`$FI` on pump.fun) | pump.fun SPL mint | The engine. Creator fees fund the ETF; ETF fees buy back & burn the coin. |
+| **FI6900 Coin** (`$FIX6900` on pump.fun) | pump.fun SPL mint | The engine. Creator fees fund the ETF; ETF fees buy back & burn the coin. |
 
 This document is the contract between the three workstreams (program / keeper / web).
 Do not change account layouts or API shapes without updating this file.
@@ -282,11 +282,11 @@ pump.fun coin trades  ──creator fee──▶  dev wallet
                                 50%                 50%
                                  │                   │
                        buy $FI6900 (Jupiter)   buy basket via Jupiter → create units
-                       + pair with SOL         → airdrop to $FI holders (every DIST_INTERVAL,
+                       + pair with SOL         → airdrop to $FIX6900 holders (every DIST_INTERVAL,
                        → add LP (Meteora)        default 15m; pro-rata, min-balance threshold)
 
 ETF fees (mint/redeem/mgmt, paid in $FI6900 units) → fee_recipient
-   75%: redeem → sell basket → SOL → buy $FI → burn (SPL burn, provable)
+   75%: redeem → sell basket → SOL → buy $FIX6900 → burn (SPL burn, provable)
    25%: treasury
 ```
 

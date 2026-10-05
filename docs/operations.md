@@ -1,6 +1,6 @@
 # FI6900 Keeper — Operations
 
-The keeper (`apps/keeper`, package `@fi6900/keeper`) is the off-chain service that prices the fund, runs the index methodology, maintains on-chain reference prices, rebalances through Dutch auctions, executes timelocked admin actions, performs AP arbitrage, operates the $FI flywheel and serves the public API consumed by the website.
+The keeper (`apps/keeper`, package `@fi6900/keeper`) is the off-chain service that prices the fund, runs the index methodology, maintains on-chain reference prices, rebalances through Dutch auctions, executes timelocked admin actions, performs AP arbitrage, operates the $FIX6900 flywheel and serves the public API consumed by the website.
 
 ## 1. Modes
 
@@ -87,8 +87,8 @@ All variables are validated with zod on boot (`src/config/env.ts`); invalid valu
 | `rebalance-check` | 60 s | reads the cached NAV; scheduled (7 d) / relative drift (>50% of target) / queued-remainder trigger → plan → `start_auction` per trade (volume-capped, end price lifted to the ref-price bound when needed) |
 | `auction-monitor` | 15 s | reconciles fills into `auction_fills`/`flywheel_events`, cancels expired auctions, **self-fills** when price ≤ mid × 0.995 (buys buy-token on Jupiter, `fill_auction`, recycles sell-token) |
 | `ap-check` | 30 s | Jupiter two-sided quote vs NAV; create (basket → `buildMintTxs` → sell units) on premium > 75 bps, redeem on discount > 75 bps; records `create`/`redeem` with profit |
-| `flywheel` | `DIST_INTERVAL_MIN` | claim creator fees (pump + PumpSwap) → 50% LP leg (buy $FI6900, add Meteora liquidity) → 50% airdrop leg (buy basket, create units) → pro-rata airdrop to $FI holders in batches of 18, dust carried forward |
-| `fee-processing` | hourly | `accrue_management_fee`, redeem fee units, sell basket → SOL, 75% buy $FI and **burn**, 25% to treasury; also resets the AP notional budget |
+| `flywheel` | `DIST_INTERVAL_MIN` | claim creator fees (pump + PumpSwap) → 50% LP leg (buy $FI6900, add Meteora liquidity) → 50% airdrop leg (buy basket, create units) → pro-rata airdrop to $FIX6900 holders in batches of 18, dust carried forward |
+| `fee-processing` | hourly | `accrue_management_fee`, redeem fee units, sell basket → SOL, 75% buy $FIX6900 and **burn**, 25% to treasury; also resets the AP notional budget |
 
 Every job has a lock (overlapping runs are skipped and logged), structured pino logs, and status is exposed in `GET /health` (`jobs`).
 

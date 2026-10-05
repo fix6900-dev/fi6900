@@ -49,7 +49,7 @@ export function VerifyView() {
       v: data ? data.upgradeAuthority ? <Address value={data.upgradeAuthority} full /> : <span className="chip chip-verified">burned</span> : UNSET,
       note: data?.upgradeAuthority ? (
         <>
-          <span className="chip chip-pending">holders trust this key</span> It can replace the program. The upgrade authority is held by the developer at launch and is scheduled to move to a Realms DAO governed by $FI holders.{" "}
+          <span className="chip chip-pending">holders trust this key</span> It can replace the program. The upgrade authority is held by the developer at launch and is scheduled to move to a Realms DAO governed by $FIX6900 holders.{" "}
           <a className="lnk" href={`${REPO}/blob/main/docs/mainnet-go-live.md`} target="_blank" rel="noreferrer noopener">
             Go-live plan ↗
           </a>

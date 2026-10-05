@@ -40,23 +40,23 @@ Every constituent targets 1/N of the vault. Winners drift above target and loser
 
 There is **no transfer tax** on `$FI6900`. A transfer tax would require Token-2022, which breaks the create/redeem arbitrage math, hurts DEX routing, and is exactly the sort of thing that makes a token look like a trap. The index earns on creation, redemption and management, like a real ETF.
 
-75% of index fee units are redeemed, sold for SOL, used to buy `$FI` and the `$FI` is burned on-chain. 25% goes to treasury for operations.
+75% of index fee units are redeemed, sold for SOL, used to buy `$FIX6900` and the `$FIX6900` is burned on-chain. 25% goes to treasury for operations.
 
-## 2. `$FI` — the pump.fun coin
+## 2. `$FIX6900` — the pump.fun coin
 
 A plain pump.fun token. Dev wallet is the creator so creator fees accrue to it on both the bonding curve and PumpSwap.
 
 Claimed creator fees are split:
 
 - **50% liquidity.** Half of it buys `$FI6900`, the other half stays SOL, and both are deposited as LP into the `$FI6900`/SOL pool. Deeper liquidity means tighter arbitrage and a tighter peg.
-- **50% airdrop.** Buys the basket, creates `$FI6900` units in-kind, and distributes them pro-rata to `$FI` holders every 15 minutes. Holding `$FI` is a continuous stream of index exposure.
+- **50% airdrop.** Buys the basket, creates `$FI6900` units in-kind, and distributes them pro-rata to `$FIX6900` holders every 15 minutes. Holding `$FIX6900` is a continuous stream of index exposure.
 
-So holding `$FI` pays you in the ETF, and ETF fees buy and burn `$FI`. Each one's volume pays the other.
+So holding `$FIX6900` pays you in the ETF, and ETF fees buy and burn `$FIX6900`. Each one's volume pays the other.
 
 ## 3. What "tax" we use and don't use
 
 - No transfer tax on either token. Pump.fun tokens cannot have one; the index should not.
-- The pump.fun **creator fee** is the "tax" on `$FI`. It is paid by the trading venue, not deducted from holders' transfers, so wallets and DEXes treat `$FI` as a normal token.
+- The pump.fun **creator fee** is the "tax" on `$FIX6900`. It is paid by the trading venue, not deducted from holders' transfers, so wallets and DEXes treat `$FIX6900` as a normal token.
 - The index's **creation, redemption and management fees** are the "tax" on `$FI6900`.
 
 ## 4. Numbers to remember

@@ -39,17 +39,17 @@ function build(data: Flywheel | undefined) {
     E: `${compact(data?.airdroppedUnits ?? 0, 2)} units · ${(data?.airdropRounds ?? 0).toLocaleString()} rounds`,
     F: `${num(buyback + treasury, 2)} SOL`,
     G: `${num(buyback, 2)} SOL`,
-    H: `${compact(data?.burnedCoin ?? 0, 2)} $FI burned`,
+    H: `${compact(data?.burnedCoin ?? 0, 2)} $FIX6900 burned`,
   };
   const t = {
-    A: ["$FI creator fees", "pump.fun and PumpSwap"],
+    A: ["$FIX6900 creator fees", "pump.fun and PumpSwap"],
     B: ["Keeper", "claims, splits, signs"],
     C: ["50% liquidity", "FI6900/SOL pool, permanent"],
     D: ["50% basket", "buy coins, mint units"],
-    E: ["Airdrop", "to $FI holders every 15 min"],
+    E: ["Airdrop", "to $FIX6900 holders every 15 min"],
     F: ["Index fees", "0.5% in, 0.5% out, 1% a year"],
-    G: ["75% buyback", "buys $FI with fee SOL"],
-    H: ["Burn $FI", "supply reduced"],
+    G: ["75% buyback", "buys $FIX6900 with fee SOL"],
+    H: ["Burn $FIX6900", "supply reduced"],
   } as const;
   const node = (id: keyof typeof t, x: number, y: number, w: number, h: number, value = ""): N => ({ id, x, y, w, h, title: t[id][0], sub: t[id][1], value });
 
@@ -126,7 +126,7 @@ function build(data: Flywheel | undefined) {
 function Diagram({ layout, flows, cls }: { layout: ReturnType<typeof build>["wide"]; flows: Flows; cls: string }) {
   const [W, H] = layout.vb;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className={`loop ${cls}`} role="img" aria-label="Fee flow. $FI creator fees go to the keeper, which splits them between FI6900/SOL liquidity and a basket purchase that is airdropped to $FI holders. Index fees buy back and burn $FI, which lowers $FI supply and feeds the creator fees again.">
+    <svg viewBox={`0 0 ${W} ${H}`} className={`loop ${cls}`} role="img" aria-label="Fee flow. $FIX6900 creator fees go to the keeper, which splits them between FI6900/SOL liquidity and a basket purchase that is airdropped to $FIX6900 holders. Index fees buy back and burn $FIX6900, which lowers $FIX6900 supply and feeds the creator fees again.">
       <defs>
         <marker id={`ak-${cls}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
           <path d="M0,0 L8,4 L0,8 z" className="mk-ink" />

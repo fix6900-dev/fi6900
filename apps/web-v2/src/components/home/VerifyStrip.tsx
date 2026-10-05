@@ -64,7 +64,7 @@ export function VerifyStrip() {
           </p>
           {data?.upgradeAuthority && (
             <p className="faint">
-              Held by the developer at launch; scheduled to move to a Realms DAO governed by $FI holders.{" "}
+              Held by the developer at launch; scheduled to move to a Realms DAO governed by $FIX6900 holders.{" "}
               <a className="lnk" href={`${REPO}/blob/main/docs/mainnet-go-live.md`} target="_blank" rel="noreferrer noopener">
                 Plan ↗
               </a>

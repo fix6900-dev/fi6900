@@ -1,6 +1,6 @@
 # FI6900 Launch Runbook
 
-Step-by-step launch of the FI6900 index fund and the $FI flywheel coin. Each step lists what to verify before moving on. Commands assume the repo root unless stated.
+Step-by-step launch of the FI6900 index fund and the $FIX6900 flywheel coin. Each step lists what to verify before moving on. Commands assume the repo root unless stated.
 
 ## 0. Prerequisites
 
@@ -11,7 +11,7 @@ Step-by-step launch of the FI6900 index fund and the $FI flywheel coin. Each ste
 - `pnpm install` done; `pnpm --filter @fi6900/keeper test` green; `pnpm test:program` green against a local validator (60 tests incl. the 40- and 301-asset suites).
 - `cd apps/keeper && LIVE=1 pnpm exec vitest run test/live --no-file-parallelism` green on the launch day (live contract tests for Jupiter, DexScreener, holder snapshots, pump.fun claim and Meteora; read-only, nothing is sent). If Jupiter or DexScreener changed shape overnight this is where it shows.
 
-## 1. Create the $FI coin on pump.fun
+## 1. Create the $FIX6900 coin on pump.fun
 
 1. From the **dev wallet** (this wallet must be the *creator*: creator fees accrue to it and the keeper claims them through `collect_creator_fee` / `collect_coin_creator_fee`), create the coin on pump.fun. Name/ticker: `FI6900 Coin` / `FI`.
 2. Record the mint → `COIN_MINT` in `apps/keeper/.env`.
@@ -135,7 +135,7 @@ The `fi6900` project (team `xperts-projects-6c5c6371`) is linked at the repo roo
    - `buy_index` + `add_lp` — a Meteora position NFT owned by the dev wallet (`position` field).
    - `create` — units minted to the dev wallet; `airdrop_pool_units` in `kv` increased.
    - `airdrop` — batches of ≤ 18 transfers; `GET /v1/airdrops/<any holder>` lists the payout; `carry` table holds dust wallets.
-5. After the first hour: `fee_accrual`, `redeem`, `buyback`, `burn`, `treasury` events. Verify the `burn` signature on Solscan shows an SPL `BurnChecked` of $FI.
+5. After the first hour: `fee_accrual`, `redeem`, `buyback`, `burn`, `treasury` events. Verify the `burn` signature on Solscan shows an SPL `BurnChecked` of $FIX6900.
 
 ## 7. Arm the timelock and hand over authority (Squads multisig)
 

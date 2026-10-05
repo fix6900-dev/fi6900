@@ -56,7 +56,7 @@ See [docs/operations.md](docs/operations.md) for the local-validator test flow a
 
 - The vault is program-owned. No key can mint units without depositing the basket, and nothing leaves the vault except through redemption or an auction fill at a bounded price.
 - Admin changes (fees, weights, constituents, roles) sit behind an on-chain timelock. Pause is instant and only ever stops activity.
-- The program is **upgradeable** and the upgrade authority is disclosed on the site's `/verify` page and home verify strip. The plan is to move it to a Realms DAO governed by `$FI` holders, see [docs/mainnet-go-live.md](docs/mainnet-go-live.md). Until then, holders are trusting that key.
+- The program is **upgradeable** and the upgrade authority is disclosed on the site's `/verify` page and home verify strip. The plan is to move it to a Realms DAO governed by `$FIX6900` holders, see [docs/mainnet-go-live.md](docs/mainnet-go-live.md). Until then, holders are trusting that key.
 - Builds are reproducible with the pinned toolchain; see [SECURITY.md](SECURITY.md) for how to verify the deployed bytes against this repository.
 
 ## License

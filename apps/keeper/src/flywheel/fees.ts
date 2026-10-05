@@ -1,6 +1,6 @@
 /**
  * ETF fee processing. fee_recipient (the keeper wallet) accumulates index units from mint/redeem/mgmt fees.
- * Hourly: accrue mgmt fee -> redeem all fee units -> sell basket to SOL -> 75% buys $FI and burns it,
+ * Hourly: accrue mgmt fee -> redeem all fee units -> sell basket to SOL -> 75% buys $FIX6900 and burns it,
  * 25% is transferred to the treasury wallet.
  */
 import { PublicKey, SystemProgram, type Connection } from '@solana/web3.js';
@@ -109,7 +109,7 @@ export class FeeProcessor {
     let burned = 0n;
     if (buybackSol > 0n) {
       const q = await this.d.quotes.quote({ inputMint: WSOL_MINT, outputMint: this.d.coinMint.toBase58(), amount: buybackSol, slippageBps: this.d.env.AP_SLIPPAGE_BPS });
-      const buySig = await this.d.tx.sendVersioned(await this.d.quotes.swapTx(q, payer), { label: 'buyback $FI' });
+      const buySig = await this.d.tx.sendVersioned(await this.d.quotes.swapTx(q, payer), { label: 'buyback $FIX6900' });
       sigs.push(buySig);
       this.d.repo.insertFlywheelEvent({ kind: 'buyback', sig: buySig, amounts: { sol: Number(buybackSol) / 1e9, coin: q.outAmount }, note: 'fee buyback' });
 
@@ -121,7 +121,7 @@ export class FeeProcessor {
       const toBurn = coinBal < q.outAmount ? coinBal : q.outAmount;
       if (toBurn > 0n) {
         const ata = getAssociatedTokenAddressSync(this.d.coinMint, this.d.tx.payer, false, coinProgram);
-        const burnSig = await this.d.tx.sendIxs([createBurnCheckedInstruction(ata, this.d.coinMint, this.d.tx.payer, toBurn, decimals, [], coinProgram)], { label: 'burn $FI' });
+        const burnSig = await this.d.tx.sendIxs([createBurnCheckedInstruction(ata, this.d.coinMint, this.d.tx.payer, toBurn, decimals, [], coinProgram)], { label: 'burn $FIX6900' });
         sigs.push(burnSig);
         burned = toBurn;
         this.d.repo.insertFlywheelEvent({ kind: 'burn', sig: burnSig, amounts: { coin: Number(toBurn) / 10 ** decimals, coinRaw: toBurn }, note: 'provable SPL burn' });

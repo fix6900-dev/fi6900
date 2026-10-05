@@ -257,9 +257,9 @@ export function mockEvent(i: number, ts: number, seed = "events"): FlywheelEvent
     case "claim": amounts.sol = +(r() * 6 + 0.4).toFixed(3); note = "Creator fee claim (pump + PumpSwap)"; break;
     case "buy_index": amounts.sol = +(r() * 3).toFixed(3); amounts.units = +(r() * 2400).toFixed(2); note = "Bought $FI6900 on Jupiter"; break;
     case "add_lp": amounts.sol = +(r() * 3).toFixed(3); amounts.units = +(r() * 2400).toFixed(2); note = "Added FI6900/SOL liquidity (Meteora)"; break;
-    case "airdrop": amounts.units = +(r() * 900 + 20).toFixed(2); amounts.wallets = Math.floor(r() * 400 + 18); note = "Pro-rata airdrop to $FI holders"; break;
-    case "buyback": amounts.sol = +(r() * 2).toFixed(3); amounts.coin = Math.floor(r() * 900_000); note = "Bought $FI with fee proceeds"; break;
-    case "burn": amounts.coin = Math.floor(r() * 900_000); note = "SPL burn of $FI"; break;
+    case "airdrop": amounts.units = +(r() * 900 + 20).toFixed(2); amounts.wallets = Math.floor(r() * 400 + 18); note = "Pro-rata airdrop to $FIX6900 holders"; break;
+    case "buyback": amounts.sol = +(r() * 2).toFixed(3); amounts.coin = Math.floor(r() * 900_000); note = "Bought $FIX6900 with fee proceeds"; break;
+    case "burn": amounts.coin = Math.floor(r() * 900_000); note = "SPL burn of $FIX6900"; break;
     case "create": amounts.units = +(r() * 5000).toFixed(2); note = "AP in-kind creation finalized"; break;
     case "redeem": amounts.units = +(r() * 3000).toFixed(2); note = "AP in-kind redemption"; break;
     case "auction_start": amounts.sellAmount = Math.floor(r() * 30_000); note = "Rebalance auction opened"; break;

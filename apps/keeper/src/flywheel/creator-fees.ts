@@ -1,5 +1,5 @@
 /**
- * Creator-fee claiming for the $FI pump.fun coin, isolated behind `CreatorFeeClaimer`.
+ * Creator-fee claiming for the $FIX6900 pump.fun coin, isolated behind `CreatorFeeClaimer`.
  *
  * Uses the official @pump-fun/pump-sdk `OnlinePumpSdk` (v2.0.0). Verified against mainnet on 2026-10-03
  * (test/live/pump.live.test.ts, simulate-only):
