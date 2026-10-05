@@ -131,6 +131,10 @@ export const EnvSchema = z.object({
   PUMP_SWEEP_ENABLED: bool(true),
   /** Minimum PUMP (UI amount) in the dev wallet before a sweep. */
   PUMP_SWEEP_MIN: numEnv(1000, 0),
+  /** Keeper working-capital ceiling (SOL). Each flywheel round recycles any excess above it into the 50/50 split. */
+  KEEPER_SOL_CEILING: numEnv(1, 0),
+  /** Smallest excess worth recycling (SOL). */
+  KEEPER_RECYCLE_MIN_SOL: numEnv(0.05, 0),
   AIRDROP_BATCH_SIZE: intEnv(18, 1),
   AIRDROP_DENYLIST: z.string().default(''),
   ATA_RENT_LAMPORTS: intEnv(2_039_280),

@@ -6,6 +6,7 @@
  */
 import { PublicKey } from '@solana/web3.js';
 import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { SystemProgram } from '@solana/web3.js';
 import type { BalanceSource } from '../chain/accounts.js';
 import type { ChainClient } from '../chain/types.js';
 import { DRY_RUN_SIG, type TxSender } from '../chain/tx.js';
@@ -37,6 +38,8 @@ export interface FlywheelDeps {
   events: EventBus;
   /** Dev-wallet token balances (PUMP reward sweep). */
   balances?: BalanceSource;
+  /** Keeper wallet (arbitrage profits accrue here); excess above KEEPER_SOL_CEILING is recycled into the flywheel. */
+  keeperTx?: TxSender;
 }
 
 export interface FlywheelCycleResult {
@@ -103,6 +106,27 @@ export class Flywheel {
         }
       } catch (err) {
         log.warn({ err: (err as Error).message }, 'PUMP sweep failed');
+      }
+    }
+
+    // ---- 1c) recycle arbitrage profit: keeper SOL above the working-capital ceiling moves to the dev wallet and
+    // joins the claimed amount, so it is split 50% liquidity / 50% airdrop like creator fees.
+    if (this.d.keeperTx && this.d.balances) {
+      try {
+        const keeperSol = Number(await this.d.balances.getSolBalance(this.d.keeperTx.payer)) / 1e9;
+        const excess = keeperSol - this.d.env.KEEPER_SOL_CEILING;
+        if (excess >= this.d.env.KEEPER_RECYCLE_MIN_SOL) {
+          const lamports = uiToBigint(excess, 9);
+          const sig = dry
+            ? DRY_RUN_SIG
+            : await this.d.keeperTx.sendIxs([SystemProgram.transfer({ fromPubkey: this.d.keeperTx.payer, toPubkey: this.d.devWallet, lamports })], { label: 'recycle arbitrage profit' });
+          claimed += lamports;
+          this.d.repo.insertFlywheelEvent({ kind: 'claim', sig, amounts: { sol: excess, lamports, keeperSolBefore: keeperSol, ceiling: this.d.env.KEEPER_SOL_CEILING, source: 'arbitrage' }, note: 'arbitrage profit above the keeper ceiling recycled into the flywheel' });
+          this.d.events.emit('flywheel_event', { kind: 'claim', sol: excess });
+          log.info({ keeperSol, ceiling: this.d.env.KEEPER_SOL_CEILING, recycledSol: excess, sig }, 'arbitrage profit recycled');
+        }
+      } catch (err) {
+        log.warn({ err: (err as Error).message }, 'profit recycle failed');
       }
     }
 
