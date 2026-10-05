@@ -3,6 +3,7 @@ import type { ChainClient } from '../chain/types.js';
 import { DRY_RUN_SIG, type TxSender } from '../chain/tx.js';
 import type { Env } from '../config/env.js';
 import type { Repo } from '../db/repo.js';
+import type { BalanceSource } from '../chain/accounts.js';
 import { creationBasket, INDEX_DECIMALS, redemptionBasket } from '../nav/compute.js';
 import type { NavService } from '../nav/service.js';
 import type { CompositeMarketData } from '../sources/market-data.js';
@@ -23,6 +24,8 @@ export interface ApDeps {
   repo: Repo;
   env: Env;
   events: EventBus;
+  /** Optional: lets the premium leg sell units the keeper already holds instead of buying basket first. */
+  balances?: BalanceSource;
 }
 
 export interface ApCycleResult {
@@ -94,9 +97,27 @@ export class ApArbitrageur {
     return { decision, executed: true, sigs };
   }
 
-  /** buy basket via Jupiter (one tx per leg) -> buildMintTxs -> sell units on Jupiter */
+  /**
+   * Premium leg. Inventory-first: if the keeper already holds enough units (e.g. the bootstrap seed), sell those
+   * directly — same effect on the peg, no basket purchase, and it replenishes operating SOL. Otherwise:
+   * buy basket via Jupiter (one tx per leg) -> buildMintTxs -> sell units on Jupiter.
+   */
   private async executeCreate(units: bigint, assets: Parameters<typeof creationBasket>[0], supply: bigint): Promise<string[]> {
     const payer = this.d.tx.payer.toBase58();
+    const indexMint = this.d.chain.indexMint.toBase58();
+    const held = this.d.balances ? await this.d.balances.getTokenBalance(this.d.tx.payer, this.d.chain.indexMint).catch(() => 0n) : 0n;
+    if (held >= units) {
+      const sellQ = await this.d.quotes.quote({ inputMint: indexMint, outputMint: WSOL_MINT, amount: units, slippageBps: this.d.env.AP_SLIPPAGE_BPS });
+      const sellTx = await this.d.quotes.swapTx(sellQ, payer);
+      const sig = await this.d.tx.sendVersioned(sellTx, { label: 'ap sell inventory units' });
+      const nav = await this.d.nav.get();
+      const navSol = nav.solPriceUsd > 0 ? ((Number(units) / 10 ** INDEX_DECIMALS) * nav.nav.navPerUnitUsd) / nav.solPriceUsd : 0;
+      const profitSol = Number(sellQ.outAmount) / 1e9 - navSol;
+      this.d.repo.insertFlywheelEvent({ kind: 'create', sig, amounts: { units, solReceived: sellQ.outAmount, navSol, profitSol, inventory: true }, note: 'AP sold inventory units at a premium to NAV' });
+      this.d.events.emit('flywheel_event', { kind: 'create', profitSol });
+      log.info({ units: units.toString(), solReceived: sellQ.outAmount.toString(), profitSol }, 'premium arb executed from inventory');
+      return [sig];
+    }
     const basket = creationBasket(assets, units, supply);
     const sigs: string[] = [];
     let solSpent = 0n;

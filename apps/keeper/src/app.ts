@@ -82,7 +82,7 @@ export async function createLiveContext(overrides: Partial<Record<keyof Env, str
   const nav = new NavService({ chain, market: sources.market, quotes: sources.quotes, repo, cfg, env, events });
   const rebalancer = new Rebalancer({ chain, tx, nav, market: sources.market, repo, cfg, env, events });
   const monitor = new AuctionMonitor({ chain, connection, tx, nav, quotes: sources.quotes, repo, cfg, env, events });
-  const ap = new ApArbitrageur({ chain, tx, nav, quotes: sources.quotes, market: sources.market, repo, env, events });
+  const ap = new ApArbitrageur({ chain, tx, nav, quotes: sources.quotes, market: sources.market, repo, env, events, balances });
   const governance = new GovernanceService({ chain, tx, repo, env });
   const refPrices = new RefPriceUpdater({ chain, tx, repo, env });
   const reconstitution = new ReconstitutionService({ chain, tx, repo, env, cfg, mints, governance });
