@@ -80,6 +80,31 @@ export class ApArbitrageur {
       notionalUsd,
     });
     log.info({ action: decision.action, premiumBps: decision.premiumBps, discountBps: decision.discountBps, profitUsd: decision.expectedProfitUsd.toFixed(2), reason: decision.reason }, 'ap check');
+
+    // Inventory leg for discounts: on a shallow pool the 14-leg redeem never pays its fixed costs, but buying units
+    // below NAV and holding them is profitable on its own (the premium leg later sells that inventory). Enabled when
+    // the keeper has SOL to spare; the buy quote already includes the pool's price impact.
+    if (decision.action === 'none' && buyPriceUsd !== null && decision.discountBps > env.AP_THRESHOLD_BPS && this.d.balances && env.AP_INVENTORY_BUY) {
+      const solBal = Number(await this.d.balances.getSolBalance(this.d.tx.payer).catch(() => 0n)) / 1e9;
+      if (solBal - env.AP_NOTIONAL_SOL >= env.AP_MIN_SOL_RESERVE) {
+        const effDiscountBps = Math.round((1 - buyPriceUsd / nav.nav.navPerUnitUsd) * 10_000);
+        if (effDiscountBps > env.AP_THRESHOLD_BPS) {
+          if (dry) {
+            this.d.repo.insertFlywheelEvent({ kind: 'redeem', sig: DRY_RUN_SIG, amounts: { notionalSol: env.AP_NOTIONAL_SOL, effDiscountBps, inventory: true }, note: 'DRY_RUN inventory buy below NAV' });
+            return { decision: { ...decision, action: 'redeem', reason: `inventory buy at ${effDiscountBps} bps below NAV (dry)` }, executed: false, sigs: [DRY_RUN_SIG] };
+          }
+          this.notionalUsedThisCycleSol += env.AP_NOTIONAL_SOL;
+          const q = await this.d.quotes.quote({ inputMint: WSOL_MINT, outputMint: indexMint, amount: uiToBigint(env.AP_NOTIONAL_SOL, 9), slippageBps: env.AP_SLIPPAGE_BPS });
+          const sig = await this.d.tx.sendVersioned(await this.d.quotes.swapTx(q, this.d.tx.payer.toBase58()), { label: 'ap buy inventory units' });
+          const unitsUi = Number(q.outAmount) / 10 ** INDEX_DECIMALS;
+          const profitUsd = unitsUi * nav.nav.navPerUnitUsd - env.AP_NOTIONAL_SOL * sol;
+          this.d.repo.insertFlywheelEvent({ kind: 'redeem', sig, amounts: { units: q.outAmount, solSpent: q.inAmount, effDiscountBps, profitUsd, inventory: true }, note: 'AP bought units below NAV and holds them as inventory' });
+          this.d.events.emit('flywheel_event', { kind: 'redeem', profitUsd });
+          log.info({ units: q.outAmount.toString(), solSpent: q.inAmount.toString(), effDiscountBps, profitUsd }, 'discount arb executed: inventory buy');
+          return { decision: { ...decision, action: 'redeem', reason: `inventory buy at ${effDiscountBps} bps below NAV` }, executed: true, sigs: [sig] };
+        }
+      }
+    }
     if (decision.action === 'none') return { decision, executed: false, sigs: [] };
 
     if (dry) {

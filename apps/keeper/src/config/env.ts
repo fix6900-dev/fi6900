@@ -117,6 +117,10 @@ export const EnvSchema = z.object({
   AP_NOTIONAL_SOL: numEnv(2, 0.01),
   AP_MAX_NOTIONAL_SOL_PER_CYCLE: numEnv(10, 0.01),
   AP_SLIPPAGE_BPS: intEnv(100, 1),
+  /** Discount leg: buy units below NAV and hold them as inventory instead of redeeming (pays on shallow pools). */
+  AP_INVENTORY_BUY: bool(true),
+  /** Never let an inventory buy take the keeper's SOL below this. */
+  AP_MIN_SOL_RESERVE: numEnv(1.5, 0),
   KILL_SWITCH: bool(false),
 
   // ---- flywheel ----
