@@ -15,6 +15,7 @@
  *   keeper add-asset <mint> [--weight bps] [--immediate] [--force]   manual add of an arbitrary mint
  *   keeper remove-asset <mint> [--immediate]    manual removal
  *   keeper governance                           timelock, pending actions, authorities, upgrade authority
+ *   keeper set-metadata [--name n] [--symbol s] [--uri u] [--dry]   create/update the index mint's Metaplex metadata (defaults TOKEN_NAME/SYMBOL/URI)
  *   keeper execute-actions [--dry]              execute due timelocked actions now
  *   keeper queue-approved [--dry]               queue every approved proposal now (normally done at the window)
  *   keeper set-ref-prices [--dry]               push reference prices from the price source now
@@ -49,6 +50,7 @@ import { logger } from './util/logger.js';
 import { stringifyBig } from './util/json.js';
 import { uiToBigint } from './util/math.js';
 import { DRY_RUN_SIG } from './chain/tx.js';
+import { ActionKind } from './chain/types.js';
 
 interface Args {
   cmd: string;
@@ -513,6 +515,38 @@ async function cli(argv: string[]): Promise<void> {
     }
     case 'governance':
       return withCtx(flags, async (ctx) => print(await ctx.provider.governance()));
+    case 'set-metadata':
+      return withCtx(flags, async (ctx) => {
+        const args = {
+          name: typeof flags.name === 'string' ? flags.name : ctx.env.TOKEN_NAME,
+          symbol: typeof flags.symbol === 'string' ? flags.symbol : ctx.env.TOKEN_SYMBOL,
+          uri: typeof flags.uri === 'string' ? flags.uri : ctx.env.TOKEN_URI,
+        };
+        const dry = Boolean(flags.dry) || ctx.env.DRY_RUN;
+        const fund = await ctx.chain.readFund();
+        const before = await ctx.chain.readTokenMetadata();
+        const authority = ctx.keeper.publicKey;
+        if (fund.authority !== authority.toBase58()) throw new Error(`keeper ${authority.toBase58()} is not the fund authority (${fund.authority})`);
+        let actionPda: PublicKey | null = null;
+        if (fund.timelockSlots > 0n) {
+          // timelock armed: the change must have been queued (ActionKind.SetTokenMetadata, key = payload hash) and be due
+          const hash = await ctx.chain.tokenMetadataHash(args);
+          const due = (await ctx.chain.readPendingActions()).find((a) => a.kind === ActionKind.SetTokenMetadata && a.key === hash);
+          if (!due) throw new Error(`timelock is armed (${fund.timelockSlots} slots): queue ActionKind.SetTokenMetadata with key ${hash} first (see docs/operations.md)`);
+          actionPda = new PublicKey(due.pda);
+        }
+        const ixs = await ctx.chain.setTokenMetadataIx(args, authority, actionPda);
+        // metadata created before initialize_fund by the keeper (devnet fund-setup): hand it to the fund PDA first
+        let adopted = false;
+        if (before && before.updateAuthority !== ctx.chain.fundPda.toBase58()) {
+          if (before.updateAuthority !== authority.toBase58()) throw new Error(`existing metadata update authority ${before.updateAuthority} is neither the fund PDA nor the keeper`);
+          ixs.unshift(...ctx.chain.transferTokenMetadataAuthorityIx(authority));
+          adopted = true;
+        }
+        const sig = await ctx.tx.sendIxs(ixs, { label: `set_token_metadata ${args.symbol}` });
+        const after = dry ? before : await ctx.chain.readTokenMetadata();
+        print({ dry, mode: before ? 'update' : 'create', adopted, args, metadata: after?.address ?? null, before, after, sig, actionPda: actionPda?.toBase58() ?? null });
+      });
     case 'execute-actions':
       return withCtx(flags, async (ctx) => print(await ctx.governance.executeDue({ dry: Boolean(flags.dry) || ctx.env.DRY_RUN })));
     case 'queue-approved':
@@ -551,6 +585,7 @@ async function cli(argv: string[]): Promise<void> {
           '  add-asset <mint> [--weight bps] [--immediate] [--force]',
           '  remove-asset <mint> [--immediate]',
           '  governance',
+          '  set-metadata [--name n] [--symbol s] [--uri u] [--dry]',
           '  execute-actions [--dry]',
           '  queue-approved [--dry]',
           '  set-ref-prices [--dry]',

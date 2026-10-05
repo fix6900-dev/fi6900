@@ -414,6 +414,10 @@ export class SdkChainClient implements ChainClient {
     return [await this.client.setTokenMetadataIx(authority, args, action)];
   }
 
+  transferTokenMetadataAuthorityIx(currentUpdateAuthority: PublicKey): TransactionInstruction[] {
+    return [this.client.transferTokenMetadataAuthorityIx(currentUpdateAuthority)];
+  }
+
   async tokenMetadataHash(args: { name: string; symbol: string; uri: string }): Promise<string> {
     return (await this.sdk.tokenMetadataHash(args)).toBase58();
   }

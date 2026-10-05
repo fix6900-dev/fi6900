@@ -73,6 +73,24 @@ If a deploy is interrupted, `solana program show --buffers --buffer-authority <d
 "open" on-chain until the keeper's auction-monitor cancels them (or `apps/keeper/scripts/expire-auctions.ts`, anyone may
 expire after `end_slot`), and `begin_mint` / `begin_redeem` require `open_auctions == 0`.
 
+### Upgrade log (2026-10-06, devnet): index-token metadata (`set_token_metadata`)
+
+In-place upgrade again (no account layout, instruction argument or error code changed; the .so grew 695,616 → 727,480 bytes).
+The change: `set_token_metadata(name, symbol, uri)` creates/updates the index mint's Metaplex metadata by CPI with the fund PDA
+signing as mint + update authority (ARCHITECTURE.md §2), plus action kind 10 for the armed-timelock path and `keeper set-metadata`.
+
+| Step | Signature / result |
+|---|---|
+| borrow 1.03 / 0.29 / 0.15 SOL from keeper / AP / burner for the buffer rent (faucet rate-limited); all returned after the upgrade | deployer 2.40 → 3.87 → 2.23 SOL |
+| `solana program extend … 31864` (695,616 → 727,480 bytes) | ok |
+| `solana program write-buffer` (727,480-byte .so, sha256 `0eefebfc3c05d6765ca7e07556926c97875a3e0e177193e37d88ae0c4e561a7e`) | buffer `D1QSmWtNHoeBWGj4TvwEmNWVJc4pyKJn7DLHJNZEUoxj` |
+| `solana program upgrade` (slot 507878913) | `4XwE8JKq5y5naWS151ajgLS32kaCaWDSmvVUMHs6xV5HK6uk6y2uumLMBjSWiSi3JqBiVEJomiUUvyZamjYSTZJt` |
+| `anchor idl upgrade` | IDL account `3eE9tJogz92RXnyEuLHBY7zJVwx6urKV9cTBkQxBf7So` upgraded |
+| `keeper set-metadata --name "FIX6900 Index (devnet)" --symbol FIXIDX --uri https://fix6900index.com/token/fix6900-index.json` (the devnet metadata pre-dated the fund and was owned by the keeper, so the tx first hands the update authority to the fund PDA, then `set_token_metadata` updates it) | `zFAE99fPG4Vto4qwb65RDVrYrjSqwDbtybSaMedQ2PRT2KYQiT62LtUBfk8iFXp8nr838xFRSj6gZpeQ2oXssfr`; metadata `8TGhEXSKdyiHcGcBVLr1YVbWaEntDuQ92AxoCvjtwaQb`, update authority `7yGHxLrFwdtmTqjUtvRPVrVPKCPfo2fqLULP2WjtEL2D` (fund PDA) |
+
+Railway / Vercel were NOT redeployed as part of this upgrade (the old SDK keeps working: nothing it sends changed); redeploy both to pick up
+`keeper set-metadata` and the new IDL.
+
 ## Reproduce from scratch
 
 All Solana CLI work runs in WSL (Anchor 0.31.1 / Solana 2.3 live there; see `Anchor.toml`); everything else on the host.

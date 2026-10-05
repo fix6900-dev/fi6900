@@ -2,6 +2,7 @@ pub mod admin;
 pub mod auction;
 pub mod fees;
 pub mod governance;
+pub mod metadata;
 pub mod mint;
 pub mod redeem;
 
@@ -9,6 +10,7 @@ pub use admin::*;
 pub use auction::*;
 pub use fees::*;
 pub use governance::*;
+pub use metadata::*;
 pub use mint::*;
 pub use redeem::*;
 

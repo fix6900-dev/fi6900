@@ -25,6 +25,7 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  SYSVAR_RENT_PUBKEY,
   SystemProgram,
   Transaction,
   TransactionInstruction,
@@ -35,10 +36,24 @@ import {
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import { expect } from "chai";
+import { createHash } from "node:crypto";
 import idl from "../target/idl/fi6900.json";
 import type { Fi6900 } from "../target/types/fi6900";
 
 export const RPC_URL = process.env.RPC_URL ?? "http://127.0.0.1:8899";
+export const TOKEN_METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
+
+/** programs/fi6900 `token_metadata_hash`: sha256 over u32-LE-length-prefixed name, symbol, uri. */
+export function tokenMetadataHash(name: string, symbol: string, uri: string): PublicKey {
+  const h = createHash("sha256");
+  for (const v of [name, symbol, uri]) {
+    const bytes = Buffer.from(v, "utf8");
+    const len = Buffer.alloc(4);
+    len.writeUInt32LE(bytes.length);
+    h.update(len).update(bytes);
+  }
+  return new PublicKey(h.digest());
+}
 export const PROGRAM_ID = new PublicKey(idl.address);
 
 export const FUND_SEED = Buffer.from("fund");
@@ -56,7 +71,7 @@ export const slotsOf = (bitmap: bigint): number[] => {
   return out;
 };
 
-export enum ActionKind { SetFees = 0, SetTargetWeight = 1, SetRebalancer = 2, SetFeeRecipient = 3, RefPriceOverride = 4, SetMaxAuctionDiscount = 5, SetTimelock = 6, AddAsset = 7, BeginRemoveAsset = 8, SetRefMovePolicy = 9 }
+export enum ActionKind { SetFees = 0, SetTargetWeight = 1, SetRebalancer = 2, SetFeeRecipient = 3, RefPriceOverride = 4, SetMaxAuctionDiscount = 5, SetTimelock = 6, AddAsset = 7, BeginRemoveAsset = 8, SetRefMovePolicy = 9, SetTokenMetadata = 10 }
 
 export const Q64 = 1n << 64n;
 export const U64_MAX = (1n << 64n) - 1n;
@@ -575,6 +590,63 @@ export class TestEnv {
       .accountsStrict({ authority: authority.publicKey, fund: this.fund, action, proposer: acc.proposer })
       .signers([authority])
       .rpc();
+  }
+
+  // -- Metaplex token metadata ---------------------------------------------
+
+  tokenMetadataPda(): PublicKey {
+    return PublicKey.findProgramAddressSync([Buffer.from("metadata"), TOKEN_METADATA_PROGRAM_ID.toBuffer(), this.indexMint.toBuffer()], TOKEN_METADATA_PROGRAM_ID)[0];
+  }
+
+  /** set_token_metadata; pass `action` (a due SetTokenMetadata PendingAction) while the timelock is armed. */
+  async setTokenMetadata(name: string, symbol: string, uri: string, opts: { authority?: Keypair; action?: PublicKey } = {}): Promise<string> {
+    const authority = opts.authority ?? this.authority;
+    const acc = opts.action ? await this.fetchAction(opts.action) : null;
+    return this.program.methods
+      .setTokenMetadata(name, symbol, uri)
+      .accountsStrict({
+        authority: authority.publicKey,
+        fund: this.fund,
+        indexMint: this.indexMint,
+        metadata: this.tokenMetadataPda(),
+        action: opts.action ?? null,
+        proposer: acc?.proposer ?? null,
+        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .signers([authority])
+      .rpc();
+  }
+
+  /** Decoded mpl Metadata (key, update_authority, mint, Data{name,symbol,uri,...}, primary_sale, is_mutable). */
+  async readTokenMetadata(): Promise<{ updateAuthority: PublicKey; mint: PublicKey; name: string; symbol: string; uri: string; sellerFeeBasisPoints: number; isMutable: boolean } | null> {
+    const info = await this.connection.getAccountInfo(this.tokenMetadataPda());
+    if (!info) return null;
+    const b = info.data;
+    let o = 1;
+    const updateAuthority = new PublicKey(b.subarray(o, o + 32));
+    o += 32;
+    const mint = new PublicKey(b.subarray(o, o + 32));
+    o += 32;
+    const str = () => {
+      const len = b.readUInt32LE(o);
+      o += 4;
+      const v = b.subarray(o, o + len).toString("utf8").replace(/\0+$/, "");
+      o += len;
+      return v;
+    };
+    const name = str();
+    const symbol = str();
+    const uri = str();
+    const sellerFeeBasisPoints = b.readUInt16LE(o);
+    o += 2;
+    if (b[o] === 1) {
+      o += 1;
+      o += 4 + b.readUInt32LE(o) * 34;
+    } else o += 1;
+    o += 1;
+    return { updateAuthority, mint, name, symbol, uri, sellerFeeBasisPoints, isMutable: b[o] === 1 };
   }
 
   async setTimelock(slots: bigint | number): Promise<string> {

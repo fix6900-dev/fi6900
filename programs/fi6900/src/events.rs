@@ -118,3 +118,15 @@ pub struct ActionCancelled {
     pub nonce: u64,
     pub kind: u8,
 }
+
+#[event]
+pub struct TokenMetadataSet {
+    pub fund: Pubkey,
+    pub index_mint: Pubkey,
+    pub metadata: Pubkey,
+    pub name: String,
+    pub symbol: String,
+    pub uri: String,
+    /// true when the metadata account was created, false when it was updated.
+    pub created: bool,
+}

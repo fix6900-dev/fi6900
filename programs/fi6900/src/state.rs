@@ -47,7 +47,8 @@ pub const ACTION_SET_TIMELOCK: u8 = 6; // values[0] = slots
 pub const ACTION_ADD_ASSET: u8 = 7; // key = mint, values[0] = target weight bps
 pub const ACTION_BEGIN_REMOVE_ASSET: u8 = 8; // key = mint
 pub const ACTION_SET_REF_MOVE_POLICY: u8 = 9; // values[0] = max_ref_move_bps, values[1] = ref_move_period_slots
-pub const ACTION_KIND_COUNT: u8 = 10;
+pub const ACTION_SET_TOKEN_METADATA: u8 = 10; // key = token_metadata_hash(name, symbol, uri); executed by set_token_metadata
+pub const ACTION_KIND_COUNT: u8 = 11;
 
 // ---------------------------------------------------------------------------
 // Bitmap helpers

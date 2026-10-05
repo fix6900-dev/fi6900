@@ -6,7 +6,7 @@ import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-tok
 import { Keypair, Transaction, VersionedTransaction, sendAndConfirmTransaction } from "@solana/web3.js";
 import { expect } from "chai";
 import * as sdk from "../packages/sdk/dist/index.js";
-import { TestEnv, big, linearPrice, buyAmountFor, Q64, waitSlots, mulDivCeil, bitmapBig, slotsOf, type AssetInfo } from "./helpers";
+import { TestEnv, big, linearPrice, buyAmountFor, Q64, waitSlots, mulDivCeil, bitmapBig, slotsOf, tokenMetadataHash, type AssetInfo } from "./helpers";
 
 const UNIT = 1_000_000n;
 
@@ -231,6 +231,31 @@ describe("@fi6900/sdk", function () {
       commitment: "confirmed",
     });
   });
+  it("setTokenMetadataIx creates/updates the Metaplex metadata; tokenMetadataHash matches the program's commitment", async () => {
+    const auth = env.authority.publicKey;
+    const args = { name: "FIX6900 Index", symbol: "FIXIDX", uri: "https://fix6900index.com/token/fix6900-index.json" };
+    expect(client.tokenMetadataPda().toBase58()).to.eq(env.tokenMetadataPda().toBase58());
+    expect((await sdk.tokenMetadataHash(args)).toBase58()).to.eq(tokenMetadataHash(args.name, args.symbol, args.uri).toBase58());
+    expect(await client.readTokenMetadata()).to.eq(null);
+    await sendAndConfirmTransaction(env.connection, new Transaction().add(await client.setTokenMetadataIx(auth, args)), [env.authority], { commitment: "confirmed" });
+    const md = (await client.readTokenMetadata())!;
+    expect([md.name, md.symbol, md.uri]).to.deep.eq([args.name, args.symbol, args.uri]);
+    expect(md.updateAuthority.toBase58()).to.eq(env.fund.toBase58());
+    expect(md.isMutable).to.eq(true);
+    // queued path at timelock 0: the hash is the action key and the same ix executes it
+    const v2 = { ...args, uri: args.uri + "?v=2" };
+    const q = await client.queueActionIx(auth, sdk.ActionPayloads.setTokenMetadata(await sdk.tokenMetadataHash(v2)));
+    await sendAndConfirmTransaction(env.connection, new Transaction().add(q.instruction), [env.authority], { commitment: "confirmed" });
+    const pending = (await client.readPendingActions()).find((a) => a.address.equals(q.action))!;
+    expect(pending.kind).to.eq(sdk.ActionKind.SetTokenMetadata);
+    await sendAndConfirmTransaction(env.connection, new Transaction().add(await client.setTokenMetadataIx(auth, v2, pending)), [env.authority], { commitment: "confirmed" });
+    expect((await client.readTokenMetadata())!.uri).to.eq(v2.uri);
+    expect(await env.connection.getAccountInfo(q.action)).to.eq(null);
+    let threw = false;
+    await client.setTokenMetadataIx(auth, { ...args, symbol: "WAYTOOLONGSYMBOL" }).catch(() => (threw = true));
+    expect(threw).to.eq(true);
+  });
+
   it("ref-price helpers mirror the program (numeraire, fair price, clamp)", () => {
     // WIF at $1.25 with 6 decimals = 1250 nano-USD per raw unit
     expect(sdk.usdToRefPriceQ64(1.25, 6)).to.eq(1250n * Q64);

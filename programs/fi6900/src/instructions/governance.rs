@@ -138,6 +138,10 @@ fn validate_payload(kind: u8, key: &Pubkey, values: &[u64; 4]) -> Result<()> {
             require!(values[1] > 0, Fi6900Error::InvalidArgument);
             Ok(())
         }
+        ACTION_SET_TOKEN_METADATA => {
+            require!(*key != Pubkey::default(), Fi6900Error::InvalidArgument);
+            Ok(())
+        }
         _ => err!(Fi6900Error::InvalidActionKind),
     }
 }
@@ -176,7 +180,7 @@ pub fn queue_action(ctx: Context<QueueAction>, kind: u8, key: Pubkey, values: [u
 }
 
 // ---------------------------------------------------------------------------
-// execute_action (every kind except ADD_ASSET)
+// execute_action (every kind except ADD_ASSET and SET_TOKEN_METADATA)
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
@@ -253,7 +257,7 @@ pub fn execute_action(ctx: Context<ExecuteAction>) -> Result<()> {
             apply_begin_remove_asset(fund, a)?;
         }
         ACTION_SET_REF_MOVE_POLICY => apply_set_ref_move_policy(fund, action.values[0] as u16, action.values[1])?,
-        ACTION_ADD_ASSET => return err!(Fi6900Error::WrongActionKind),
+        ACTION_ADD_ASSET | ACTION_SET_TOKEN_METADATA => return err!(Fi6900Error::WrongActionKind),
         _ => return err!(Fi6900Error::InvalidActionKind),
     }
 

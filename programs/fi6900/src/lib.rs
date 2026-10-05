@@ -104,6 +104,13 @@ pub mod fi6900 {
         instructions::bootstrap_mint(ctx, units)
     }
 
+    /// Metaplex metadata (name / symbol / uri) for the index mint, created or updated through the
+    /// fund PDA (mint + update authority). Direct while the timelock is 0; otherwise pass the due
+    /// ACTION_SET_TOKEN_METADATA action (key = token_metadata_hash) and its proposer.
+    pub fn set_token_metadata(ctx: Context<SetTokenMetadata>, name: String, symbol: String, uri: String) -> Result<()> {
+        instructions::set_token_metadata(ctx, name, symbol, uri)
+    }
+
     // ----- Governance: reference prices + timelock -----------------------
 
     /// Rebalancer or authority. Q64.64 numeraire per raw base unit.
@@ -116,7 +123,7 @@ pub mod fi6900 {
         instructions::queue_action(ctx, kind, key, values)
     }
 
-    /// Anyone, after eta. Every kind except ADD_ASSET.
+    /// Anyone, after eta. Every kind except ADD_ASSET / SET_TOKEN_METADATA (which have their own ixs).
     pub fn execute_action(ctx: Context<ExecuteAction>) -> Result<()> {
         instructions::execute_action(ctx)
     }

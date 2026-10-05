@@ -258,6 +258,33 @@ Rules for a fix once a fund exists:
 - Upgrade when `open_auctions == 0` and no mint/redeem session is open (check `/v1/auctions?status=open`; sessions are visible with `getProgramAccounts` on the session discriminators), so no in-flight flow straddles two program versions.
 - If the .so grew, `solana program extend` first (rent for the extra bytes); the deployer needs the buffer rent (~3.5 SOL for 690 KB) up front, which the upgrade refunds.
 
+### Upgrades (mainnet)
+
+Every signature below is on mainnet-beta (`https://solscan.io/tx/<sig>`).
+
+#### 2026-10-06 — index-token metadata (`set_token_metadata`)
+
+Why: the index mint had no Metaplex metadata, so Dexscreener / Jupiter / wallets showed "?". Only the mint authority (the fund PDA) can create it,
+so the program gained `set_token_metadata(name, symbol, uri)` (CPI with the fund PDA as mint + update authority; action kind 10 once the
+timelock is armed; ARCHITECTURE.md §2). No account layout, instruction argument or error code changed; the .so grew 689,464 → 727,480 bytes.
+Rehearsed on devnet first (`docs/devnet.md`, upgrade log 2026-10-06). Tests: 75 passing (`pnpm test:program`, local validator with the
+token-metadata program preloaded).
+
+| Step | Signature / result |
+|---|---|
+| deployer top-up for the buffer rent (1.6 SOL from the dev wallet; coordinator) | `43aueajWRQuyuDQQYtSnr12a3KMro6qJ7yVBaEmUjeCiyuzJ9if4kTdUKkqPgUd3F24KzrxVaVu14oeYpca5TUqs` (deployer 4.03 SOL) |
+| `solana program write-buffer` (727,480-byte .so, sha256 `0eefebfc3c05d6765ca7e07556926c97875a3e0e177193e37d88ae0c4e561a7e`) | buffer `ESDXnypSp3RTf43Qk35BfFLv2dBrgjopvdQu78kBLkrM` (3.78 SOL rent, refunded by the upgrade) |
+| `anchor idl upgrade` | IDL account `3eE9tJogz92RXnyEuLHBY7zJVwx6urKV9cTBkQxBf7So` upgraded (ran before the program upgrade because `extend`/`upgrade` reject `--with-compute-unit-price` in solana-cli 2.3; harmless, the IDL only describes the new ix) |
+| `solana program extend … 38016` (689,464 → 727,480 bytes; 0.265 SOL rent) | ok |
+| `solana program upgrade ESDX… Cdzgsq…` (slot 453711545) | `35e5T4HMZCsge1PWYUBz14b5xwhpvoF6sHkPk87Ax3oDNZ6P5cgbso28uKpPTMwPYoGYB5Ls8odtt52p2E22MUp7` |
+| `keeper set-metadata --name "FIX6900 Index" --symbol FIXIDX --uri https://fix6900index.com/token/fix6900-index.json` (ENV_FILE=.env.mainnet, keeper = fund authority, timelock 0 → direct) | `pkw9aqfALADVjsRSzgzJUEVMn8wBrdoBH2MQZ9y56AzjV9bfRyNpcMzwy3kNsj9PRyVivnpm1G8XHH2LZNvXP2F`; metadata PDA `ByY5WNeGm1dijaBYstkr9pHHcVbaebi3iRtq4iofb4wP`, update authority `9UeiZeS9W7NG3Sa5ZB9Y3A8hnrznc5E8Uw3b7GGzHtgj` (fund PDA), `is_mutable` |
+| deployer after the upgrade | 3.83 SOL (buffer rent refunded; the 1.6 SOL top-up can go back to the dev wallet) |
+
+Two stale sessions (a web user's mint session and the keeper's redeem session, ~1 h old, `ready`) were open at upgrade time; since no
+layout or existing instruction changed they carried over unaffected. The off-chain JSON / PNG the URI points to live in
+`apps/web-v2/public/token/` and resolve once the site is deployed. Railway / Vercel still need a redeploy for the new SDK (`set-metadata`
+is a CLI command, so nothing user-facing breaks until then).
+
 ## 8b. 🔑 Later (week 2+): `$FIX6900` as the voting token via Realms
 
 Do this only once `$FIX6900` has enough holders for a vote to mean something. Nothing in the program changes; the fund authority simply becomes a DAO governance account instead of the Squads vault.

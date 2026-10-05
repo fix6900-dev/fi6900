@@ -3,6 +3,7 @@ import { Connection, PublicKey, type GetProgramAccountsFilter } from "@solana/we
 import BN from "bn.js";
 import idl from "../idl/fi6900.json";
 import { MAX_ASSETS, PROGRAM_ID } from "./constants.js";
+import { tokenMetadataPda } from "./pda.js";
 
 const coder = new BorshAccountsCoder(idl as Idl);
 
@@ -431,4 +432,58 @@ function bs58Encode(bytes: Uint8Array | Buffer): string {
     else break;
   }
   return s;
+}
+
+/** Decoded mpl-token-metadata `Metadata` account (the fields the index token needs). */
+export interface TokenMetadataAccount {
+  address: PublicKey;
+  updateAuthority: PublicKey;
+  mint: PublicKey;
+  name: string;
+  symbol: string;
+  uri: string;
+  sellerFeeBasisPoints: number;
+  isMutable: boolean;
+}
+
+/**
+ * Borsh layout of mpl-token-metadata `Metadata`: key u8, update_authority 32, mint 32, then `Data`
+ * (name / symbol / uri as u32-length-prefixed strings padded with NULs, seller_fee_basis_points u16,
+ * creators Option<Vec>), primary_sale_happened bool, is_mutable bool.
+ */
+export function decodeTokenMetadata(address: PublicKey, data: Buffer | Uint8Array): TokenMetadataAccount {
+  const b = Buffer.from(data);
+  let o = 1;
+  const updateAuthority = new PublicKey(b.subarray(o, o + 32));
+  o += 32;
+  const mint = new PublicKey(b.subarray(o, o + 32));
+  o += 32;
+  const str = (): string => {
+    const len = b.readUInt32LE(o);
+    o += 4;
+    const v = b.subarray(o, o + len).toString("utf8").replace(/\0+$/, "");
+    o += len;
+    return v;
+  };
+  const name = str();
+  const symbol = str();
+  const uri = str();
+  const sellerFeeBasisPoints = b.readUInt16LE(o);
+  o += 2;
+  if (b[o] === 1) {
+    o += 1;
+    const n = b.readUInt32LE(o);
+    o += 4 + n * (32 + 1 + 1);
+  } else o += 1;
+  o += 1; // primary_sale_happened
+  const isMutable = b[o] === 1;
+  return { address, updateAuthority, mint, name, symbol, uri, sellerFeeBasisPoints, isMutable };
+}
+
+/** The Metaplex metadata of `mint`, or null when the metadata account does not exist. */
+export async function readTokenMetadata(connection: Connection, mint: PublicKey): Promise<TokenMetadataAccount | null> {
+  const [address] = tokenMetadataPda(mint);
+  const info = await connection.getAccountInfo(address);
+  if (!info) return null;
+  return decodeTokenMetadata(address, info.data);
 }

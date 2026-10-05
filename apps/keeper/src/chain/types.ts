@@ -235,6 +235,8 @@ export interface ChainClient {
   readTokenMetadata(): Promise<TokenMetadataState | null>;
   /** Direct while timelock == 0; with the timelock armed pass the due SetTokenMetadata action PDA. */
   setTokenMetadataIx(args: { name: string; symbol: string; uri: string }, authority: PublicKey, actionPda?: PublicKey | null): Promise<TransactionInstruction[]>;
+  /** Plain mpl `UpdateMetadataAccountV2` handing existing metadata to the fund PDA, signed by its current update authority. */
+  transferTokenMetadataAuthorityIx(currentUpdateAuthority: PublicKey): TransactionInstruction[];
   /** `key` for a queued SetTokenMetadata action (sha256 commitment to the payload). */
   tokenMetadataHash(args: { name: string; symbol: string; uri: string }): Promise<string>;
 }

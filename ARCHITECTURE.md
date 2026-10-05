@@ -133,7 +133,7 @@ PendingAction (PDA: ["pending", fund, action_nonce_le])        borsh, 8 + 146 by
   bump: u8
 ```
 
-Upgrade compatibility: the program is upgradeable in place (`docs/mainnet-go-live.md` §8). `Fund` and `Asset` hold the money and must stay byte-compatible once a fund exists — new fields go into their `reserved` tail (`Fund.reserved: [u8; 64]`, `Asset.reserved: [u8; 32]`), never reordered or resized; `MintSession` / `RedeemSession` are short-lived (minutes) and may change shape between upgrades as long as it is documented and no session is open across the upgrade; `Auction` and `PendingAction` have no reserved bytes (append only with a space change, i.e. only while none is open). The fee-on-transfer upgrade (2026-10-05) changed no account layout, only instruction arguments and error codes.
+Upgrade compatibility: the program is upgradeable in place (`docs/mainnet-go-live.md` §8). `Fund` and `Asset` hold the money and must stay byte-compatible once a fund exists — new fields go into their `reserved` tail (`Fund.reserved: [u8; 64]`, `Asset.reserved: [u8; 32]`), never reordered or resized; `MintSession` / `RedeemSession` are short-lived (minutes) and may change shape between upgrades as long as it is documented and no session is open across the upgrade; `Auction` and `PendingAction` have no reserved bytes (append only with a space change, i.e. only while none is open). The fee-on-transfer upgrade (2026-10-05) changed no account layout, only instruction arguments and error codes. The token-metadata upgrade (2026-10-06) added the `set_token_metadata` instruction, action kind 10 and the `TokenMetadataSet` event; no account layout, instruction argument or error code changed, so old clients keep working (the .so grew 689,464 → 727,480 bytes, hence a `solana program extend` before the upgrade).
 
 Layout notes (implemented): the 64-slot `u64` bitmaps became `[u64; 8]` (512 slots) and `Asset.index` became `u16`; `asset_count` is `u16`. The two session accounts carry 512 `u64`s (4 KB) and are therefore `#[account(zero_copy)]` loaded through `AccountLoader` (no 4 KB struct ever touches the SBF stack); their TS decoding is byte-identical to borsh because the layout has no padding (`_pad` is explicit). `Fund` gained the governance fields; `Asset` gained the ref-price fields (`reserved` is 32 bytes). Additional error codes beyond the original list: `InvalidMint`, `InvalidArgument`, `EmptyVault`, `InsufficientBalance`, `AlreadyWithdrawn`, `WrongAssetStatus`, `SessionNotReady`, `SessionAlreadyReady`, `RefPriceUnset`, `RefPriceMoveTooLarge`, `PriceBelowBound`, `TimelockRequired`, `TimelockNotElapsed`, `InvalidActionKind`, `WrongActionKind`, `WrongActionTarget`, `ShortDeposit`, `ShortFill`. Fees are capped at 1000 bps each. `set_paused` bit0 also blocks `deposit`/`finalize_mint`; bit2 also blocks `fill_auction`. `close_redeem` treats "bitmap complete" as "every slot with a non-zero entitlement has been withdrawn". `fill_auction` additionally requires `sell_amount <= effective_balance` of the sell asset so open mint/redeem reservations can never be sold.
 
@@ -176,6 +176,7 @@ Action kinds (`kind`, payload):
 | 7 | `add_asset` | mint | `[target_weight_bps]` (executed with `execute_action_add_asset`, which creates the Asset + vault) |
 | 8 | `begin_remove_asset` | asset mint | — |
 | 9 | `set_ref_move_policy` | — | `[max_ref_move_bps, ref_move_period_slots]` |
+| 10 | `set_token_metadata` | `token_metadata_hash(name, symbol, uri)` = sha256 over the three strings, each u32-LE-length-prefixed | — (executed with `set_token_metadata(name, symbol, uri)` by the authority; `execute_action` refuses this kind) |
 
 ### Instructions
 
@@ -187,6 +188,7 @@ Admin / setup
 - `set_timelock(slots)` — arms the timelock while it is 0. `set_auction_params(max_auction_discount_bps, max_ref_move_bps, ref_move_period_slots)` — direct (timelock 0).
 - `finalize_remove_asset` — requires vault.amount == 0 && pending == 0; closes Asset, clears both bits.
 - `propose_authority`, `accept_authority`
+- `set_token_metadata(name, symbol, uri)` — authority. Creates (`CreateMetadataAccountV3`) or updates (`UpdateMetadataAccountV2`) the index mint's Metaplex metadata PDA `["metadata", metaqbx…, index_mint]` by CPI with the fund PDA signing as mint authority **and** update authority (`is_mutable`, no creators, 0 seller fee); the two instructions are hand-encoded, the program has no mpl crate dependency. Limits 32 / 10 / 200 bytes (`InvalidArgument`). Direct while the timelock is 0; once armed the call must carry a due `ACTION_SET_TOKEN_METADATA` whose `key` equals the payload hash (`TimelockRequired` / `WrongActionTarget` / `TimelockNotElapsed`), which it closes (rent → proposer) and reports with `ActionExecuted`. Emits `TokenMetadataSet { created }`.
 - `bootstrap_mint(units)` — authority only, supply must be 0; the basket must already be in the vaults (`[Asset, vault]` for every active slot in ONE tx → ≤ ~58 assets; larger funds bootstrap with the first ≤58 and add the rest with empty vaults). Used once at launch.
 
 Governance
@@ -261,9 +263,9 @@ Cadence:
 - Liquidity safety valve: no single auction may sell more than `rebalance.maxTradePctOfDailyVolume` (default 5%) of the asset's 24h volume; the remainder is queued to the next cycle. This is the "don't flash-crash the small names" constraint from the equal-weight literature.
 - Auction curves start at mid × (1 + startPremiumBps) and decay to mid × (1 − maxDiscountBps), but never below the on-chain bound `fair × (1 − max_auction_discount_bps)` computed from the two assets' ref prices (the keeper lifts the end price to the bound and logs it).
 - Reconstitution (add/remove constituents) on the 1st of each month, 00:00 UTC, announced 48h ahead via API `announcements`. The methodology job never applies changes itself: it records **proposals**; in `reconstitution.mode = manual` (default) the index committee approves/rejects them (CLI `keeper approve|reject`, `POST /v1/admin/...`), in `auto` they are approved automatically. Approved items are queued as timelocked `PendingAction`s at the window (or at once with `--immediate`) and execute after the timelock. Rejections suppress re-proposal for `reconstitution.rejectCooldownDays` (default 90).
+- **Holder governance (v1, `docs/governance.md`).** `$FIX6900` holders vote on `add_asset` / `remove_asset` and on a whitelisted set of parameters (`eligibility.minVolume24hUsd` 50k..2M, `rebalance.driftRelativeBps` 1000..10000, `FEE_BURN_PCT` 0..100, `flywheel.airdropShareBps` 0..10000). A vote is an ed25519-signed message (gasless), weighted by the wallet's balance at the proposal's snapshot slot; the snapshot drops the airdrop exclusion set (pools, PDAs, program accounts, incinerator, denylist, own wallets) and its sum is the circulating supply. Window 48 h, quorum 5 % of circulating (for+against+abstain), passes when for > against; proposing needs 0.5 % of circulating. The `governance` job (60 s) closes ended proposals; a passed add/remove becomes an approved reconstitution proposal queued through the timelock (status `queued` → `executed` via `reconcileExecuted`), a passed parameter is written to the kv store as `cfg.<key>` and read by the methodology job, rebalancer, fee processor and flywheel at the point of use (`config/overrides.ts`; `GET /v1/methodology` reports the effective config). Every step is a `flywheel_events` row of kind `governance`.
 
 Index level (divisor method, like S&P):
-- **Holder governance (v1, `docs/governance.md`).** `$FIX6900` holders vote on `add_asset` / `remove_asset` and on a whitelisted set of parameters (`eligibility.minVolume24hUsd` 50k..2M, `rebalance.driftRelativeBps` 1000..10000, `FEE_BURN_PCT` 0..100, `flywheel.airdropShareBps` 0..10000). A vote is an ed25519-signed message (gasless), weighted by the wallet's balance at the proposal's snapshot slot; the snapshot drops the airdrop exclusion set (pools, PDAs, program accounts, incinerator, denylist, own wallets) and its sum is the circulating supply. Window 48 h, quorum 5 % of circulating (for+against+abstain), passes when for > against; proposing needs 0.5 % of circulating. The `governance` job (60 s) closes ended proposals; a passed add/remove becomes an approved reconstitution proposal queued through the timelock (status `queued` → `executed` via `reconcileExecuted`), a passed parameter is written to the kv store as `cfg.<key>` and read by the methodology job, rebalancer, fee processor and flywheel at the point of use (`config/overrides.ts`; `GET /v1/methodology` reports the effective config). Every step is a `flywheel_events` row of kind `governance`.
 ```
 level_t = Σ_i price_i,t × effective_balance_i,t / divisor_t
 divisor_0 = Σ price × balance / 1000      (base level 1000 at inception)
@@ -326,8 +328,6 @@ GET /v1/quote/redeem?units=  { basket:[{mint, amount}], estValueUsd }
 POST /v1/admin/proposals/:mint/approve   body { weightBps?, immediate? }      // Authorization: Bearer ADMIN_TOKEN (403 when ADMIN_TOKEN unset)
 POST /v1/admin/proposals/:mint/reject    body { note? }
 POST /v1/admin/assets                    body { mint, action?: 'add'|'remove', weightBps?, immediate?, force? }
-```
-
 
 GET  /v1/governance/proposals?status=&wallet=   [{ id, kind:'add_asset'|'remove_asset'|'set_param', payload, summary, title, description, proposer, createdTs, snapshotSlot, snapshotSupply,
                                                   snapshotHolders, startTs, endTs, quorumBps, status:'open'|'passed'|'failed'|'queued'|'executed'|'cancelled', timeLeftSec,
@@ -341,9 +341,11 @@ POST /v1/governance/proposals                   body { kind, payload, title, des
 POST /v1/governance/proposals/:id/vote          body { wallet, choice:'for'|'against'|'abstain', message, signature } -> GovProposal
                                                 // message = `FIX6900 governance: vote <choice> on proposal <id> (snapshot slot <slot>)`; weight = snapshot balance; re-vote replaces
 POST /v1/admin/governance/proposals/:id/cancel  body { note? }     // ADMIN_TOKEN; open or passed only
-`upgradeAuthority` / `programDataAddress` are read from the BPF upgradeable loader: the program account points at its ProgramData account, whose `Option<Pubkey>` upgrade authority is `null` once burned.
+```
 
 Holder-governance POSTs are rate-limited (20 per minute per IP + wallet, 429) and answer 400 (validation / message mismatch), 403 (bad signature, below threshold, no snapshot balance), 404, 409 (closed, duplicate, already a constituent) or 503 (`GOV_ENABLED=false` or no `COIN_MINT`). `GET /v1/governance` carries a `governance` block: `{ enabled, coinMint, counts:{open,passed,failed,queued,executed,cancelled}, params:{ votingHours, quorumBps, proposalThresholdBps, maxOpenPerWallet, allowedParams:[{key,label,unit,min,max,integer,applies}], devAcceptAnyBalance }, overrides:{ '<key>': value }, lastSnapshot:{ proposalId, slot, supply, holders } | null }`. `flywheel/events` gains kinds `treasury` and `governance` (sig `off-chain` until a queue transaction exists). Full rules and message formats: `docs/governance.md`.
+
+`upgradeAuthority` / `programDataAddress` are read from the BPF upgradeable loader: the program account points at its ProgramData account, whose `Option<Pubkey>` upgrade authority is `null` once burned.
 
 SSE: `GET /v1/stream` emits `fund`, `holdings`, `auction`, `flywheel_event` messages.
 

@@ -1,0 +1,11 @@
+{
+  "name": "FIX6900 Index",
+  "symbol": "FIXIDX",
+  "description": "Redeemable in-kind for a pro-rata share of the FIX6900 equal-weight Solana memecoin index vault. Mint authority is the index program; no key can mint without depositing the basket.",
+  "image": "https://fix6900index.com/token/fix6900-index.png",
+  "external_url": "https://fix6900index.com",
+  "attributes": [
+    { "trait_type": "Type", "value": "Index units" },
+    { "trait_type": "Weighting", "value": "Equal" }
+  ]
+}

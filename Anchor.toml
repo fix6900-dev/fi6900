@@ -22,3 +22,11 @@ test = "pnpm --filter @fi6900/sdk build && pnpm exec ts-mocha -p ./tsconfig.json
 
 [test]
 startup_wait = 20000
+
+# `set_token_metadata` CPIs into mpl-token-metadata: clone it from mainnet for `anchor test`
+# (~/validator.sh preloads the same program from a `solana program dump` for `pnpm test:program`).
+[test.validator]
+url = "https://api.mainnet-beta.solana.com"
+
+[[test.validator.clone]]
+address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"

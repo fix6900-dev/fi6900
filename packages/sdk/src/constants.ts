@@ -49,6 +49,8 @@ export enum ActionKind {
   BeginRemoveAsset = 8,
   /** values[0] = max_ref_move_bps, values[1] = ref_move_period_slots */
   SetRefMovePolicy = 9,
+  /** key = tokenMetadataHash(name, symbol, uri); executed by `set_token_metadata` (not execute_action) */
+  SetTokenMetadata = 10,
 }
 
 export const ACTION_KIND_NAMES: Record<ActionKind, string> = {
@@ -62,7 +64,15 @@ export const ACTION_KIND_NAMES: Record<ActionKind, string> = {
   [ActionKind.AddAsset]: "add_asset",
   [ActionKind.BeginRemoveAsset]: "begin_remove_asset",
   [ActionKind.SetRefMovePolicy]: "set_ref_move_policy",
+  [ActionKind.SetTokenMetadata]: "set_token_metadata",
 };
+
+/** Metaplex token-metadata program (the index mint's metadata PDA lives under it). */
+export const TOKEN_METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
+/** mpl-token-metadata DataV2 limits (bytes). */
+export const METADATA_MAX_NAME_LENGTH = 32;
+export const METADATA_MAX_SYMBOL_LENGTH = 10;
+export const METADATA_MAX_URI_LENGTH = 200;
 
 /** Governance defaults set by initialize_fund. */
 export const DEFAULT_MAX_AUCTION_DISCOUNT_BPS = 500;
@@ -85,6 +95,7 @@ export const SEEDS = {
   redeemSession: Buffer.from("redeem_session"),
   auction: Buffer.from("auction"),
   pending: Buffer.from("pending"),
+  metadata: Buffer.from("metadata"),
 } as const;
 
 /**

@@ -17,6 +17,7 @@ import {
   mulDivCeil,
   mulDivFloor,
   sleep,
+  tokenMetadataHash,
   transferFeeFor,
   waitSlots,
 } from "./helpers";
@@ -796,6 +797,42 @@ describe("fi6900 program", function () {
     });
   });
 
+  describe("token metadata (Metaplex)", () => {
+    const NAME = "FIX6900 Index";
+    const SYMBOL = "FIXIDX";
+    const URI = "https://fix6900index.com/token/fix6900-index.json";
+
+    it("set_token_metadata creates the metadata account through the fund PDA (mint + update authority)", async () => {
+      expect(await env.readTokenMetadata()).to.eq(null);
+      await expectAnchorError(env.setTokenMetadata(NAME, SYMBOL, URI, { authority: user }), "Unauthorized");
+      await expectAnchorError(env.setTokenMetadata("x".repeat(33), SYMBOL, URI), "InvalidArgument");
+      await expectAnchorError(env.setTokenMetadata(NAME, "SYMBOLTOOLONG", URI), "InvalidArgument");
+      await expectAnchorError(env.setTokenMetadata(NAME, SYMBOL, "u".repeat(201)), "InvalidArgument");
+      const sig = await env.setTokenMetadata(NAME, SYMBOL, URI);
+      const md = (await env.readTokenMetadata())!;
+      expect(md.name).to.eq(NAME);
+      expect(md.symbol).to.eq(SYMBOL);
+      expect(md.uri).to.eq(URI);
+      expect(md.updateAuthority.toBase58()).to.eq(env.fund.toBase58());
+      expect(md.mint.toBase58()).to.eq(env.indexMint.toBase58());
+      expect(md.sellerFeeBasisPoints).to.eq(0);
+      expect(md.isMutable).to.eq(true);
+      const ev = (await env.events(sig)).find((e) => e.name === "tokenMetadataSet");
+      expect(ev?.data.created).to.eq(true);
+      expect(ev?.data.name).to.eq(NAME);
+      // the fund still owns the mint
+      expect((await getMint(env.connection, env.indexMint)).mintAuthority?.toBase58()).to.eq(env.fund.toBase58());
+    });
+
+    it("a second call updates the existing metadata in place", async () => {
+      const sig = await env.setTokenMetadata(NAME, SYMBOL, URI + "?v=2");
+      const md = (await env.readTokenMetadata())!;
+      expect(md.uri).to.eq(URI + "?v=2");
+      expect(md.name).to.eq(NAME);
+      expect((await env.events(sig)).find((e) => e.name === "tokenMetadataSet")?.data.created).to.eq(false);
+    });
+  });
+
   describe("admin timelock", () => {
     const TL = 20;
     const auth = () => env.authority.publicKey;
@@ -823,6 +860,8 @@ describe("fi6900 program", function () {
       await expectAnchorError(env.addAsset(mint, 6, TOKEN_PROGRAM_ID, 0), "TimelockRequired");
       // authority ref-price override beyond the cap also needs the timelock now
       await expectAnchorError(env.setRefPrice(env.assets[2], 3n * Q64), "TimelockRequired");
+      // token metadata changes must be queued too
+      await expectAnchorError(env.setTokenMetadata("FIX6900 Index", "FIXIDX", "https://x"), "TimelockRequired");
       // protective pause stays instant
       await env.program.methods.setPaused(1).accountsStrict({ authority: auth(), fund: env.fund }).rpc();
       await env.program.methods.setPaused(0).accountsStrict({ authority: auth(), fund: env.fund }).rpc();
@@ -895,6 +934,25 @@ describe("fi6900 program", function () {
         .accountsStrict({ authority: auth(), fund: env.fund, asset: added.asset, vault: added.vault, tokenProgram: TOKEN_PROGRAM_ID })
         .rpc();
       expect(await env.connection.getAccountInfo(added.asset)).to.eq(null);
+    });
+
+    it("set_token_metadata goes through the queue: the action key commits to the payload hash", async () => {
+      const name = "FIX6900 Index";
+      const symbol = "FIXIDX";
+      const uri = "https://fix6900index.com/token/fix6900-index.json?v=3";
+      await expectAnchorError(env.queueAction(ActionKind.SetTokenMetadata, PublicKey.default, []), "InvalidArgument");
+      const q = await env.queueAction(ActionKind.SetTokenMetadata, tokenMetadataHash(name, symbol, uri), []);
+      await expectAnchorError(env.setTokenMetadata(name, symbol, uri, { action: q.action }), "TimelockNotElapsed");
+      await waitSlots(env.connection, TL + 1);
+      // generic execute_action refuses this kind; a different payload does not match the commitment
+      await expectAnchorError(env.executeAction(q.action, user), "WrongActionKind");
+      await expectAnchorError(env.setTokenMetadata(name, symbol, uri + "x", { action: q.action }), "WrongActionTarget");
+      const sig = await env.setTokenMetadata(name, symbol, uri, { action: q.action });
+      expect((await env.readTokenMetadata())!.uri).to.eq(uri);
+      expect(await env.connection.getAccountInfo(q.action)).to.eq(null);
+      const names = (await env.events(sig)).map((e) => e.name);
+      expect(names).to.include("actionExecuted");
+      expect(names).to.include("tokenMetadataSet");
     });
 
     it("lowering the timelock itself is timelocked; once 0 the direct setters work again", async () => {

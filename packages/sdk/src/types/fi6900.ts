@@ -785,7 +785,7 @@ export type Fi6900 = {
     {
       "name": "executeAction",
       "docs": [
-        "Anyone, after eta. Every kind except ADD_ASSET."
+        "Anyone, after eta. Every kind except ADD_ASSET / SET_TOKEN_METADATA (which have their own ixs)."
       ],
       "discriminator": [
         246,
@@ -1644,6 +1644,118 @@ export type Fi6900 = {
       ]
     },
     {
+      "name": "setTokenMetadata",
+      "docs": [
+        "Metaplex metadata (name / symbol / uri) for the index mint, created or updated through the",
+        "fund PDA (mint + update authority). Direct while the timelock is 0; otherwise pass the due",
+        "ACTION_SET_TOKEN_METADATA action (key = token_metadata_hash) and its proposer."
+      ],
+      "discriminator": [
+        218,
+        126,
+        122,
+        193,
+        220,
+        149,
+        103,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "fund"
+          ]
+        },
+        {
+          "name": "fund",
+          "relations": [
+            "action"
+          ]
+        },
+        {
+          "name": "indexMint",
+          "relations": [
+            "fund"
+          ]
+        },
+        {
+          "name": "metadata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "tokenMetadataProgram"
+              },
+              {
+                "kind": "account",
+                "path": "indexMint"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "tokenMetadataProgram"
+            }
+          }
+        },
+        {
+          "name": "action",
+          "docs": [
+            "Required while the timelock is armed: a due ACTION_SET_TOKEN_METADATA whose key is the payload hash."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "proposer",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "address": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "symbol",
+          "type": "string"
+        },
+        {
+          "name": "uri",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "startAuction",
       "discriminator": [
         255,
@@ -2051,6 +2163,19 @@ export type Fi6900 = {
         31,
         9,
         117
+      ]
+    },
+    {
+      "name": "tokenMetadataSet",
+      "discriminator": [
+        203,
+        73,
+        184,
+        127,
+        183,
+        146,
+        2,
+        247
       ]
     }
   ],
@@ -3167,6 +3292,45 @@ export type Fi6900 = {
           {
             "name": "slot",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "tokenMetadataSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fund",
+            "type": "pubkey"
+          },
+          {
+            "name": "indexMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "name": "uri",
+            "type": "string"
+          },
+          {
+            "name": "created",
+            "docs": [
+              "true when the metadata account was created, false when it was updated."
+            ],
+            "type": "bool"
           }
         ]
       }

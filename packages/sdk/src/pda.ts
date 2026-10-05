@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
-import { PROGRAM_ID, SEEDS } from "./constants.js";
+import { PROGRAM_ID, SEEDS, TOKEN_METADATA_PROGRAM_ID } from "./constants.js";
 
 export type NonceLike = bigint | number | BN;
 
@@ -66,4 +66,9 @@ export function randomNonce(): bigint {
 /** PendingAction PDA: ["pending", fund, action_nonce_le] */
 export function pendingActionPda(fund: PublicKey, nonce: NonceLike, programId: PublicKey = PROGRAM_ID): [PublicKey, number] {
   return PublicKey.findProgramAddressSync([SEEDS.pending, fund.toBuffer(), nonceToLeBytes(nonce)], programId);
+}
+
+/** Metaplex metadata PDA of a mint: ["metadata", token-metadata program, mint] under the token-metadata program. */
+export function tokenMetadataPda(mint: PublicKey, tokenMetadataProgramId: PublicKey = TOKEN_METADATA_PROGRAM_ID): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([SEEDS.metadata, tokenMetadataProgramId.toBuffer(), mint.toBuffer()], tokenMetadataProgramId);
 }

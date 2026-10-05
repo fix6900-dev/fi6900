@@ -16,6 +16,7 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  SYSVAR_RENT_PUBKEY,
   SystemProgram,
   TransactionInstruction,
   TransactionMessage,
@@ -34,12 +35,24 @@ import {
   readPendingAction,
   readPendingActions,
   readRedeemSession,
+  readTokenMetadata,
   type AssetAccount,
   type AuctionAccount,
   type FundAccount,
   type PendingActionAccount,
+  type TokenMetadataAccount,
 } from "./accounts.js";
-import { ActionKind, BEGIN_PAIRS_PER_TX, DEPOSITS_PER_TX, PROGRAM_ID, WITHDRAWS_PER_TX } from "./constants.js";
+import {
+  ActionKind,
+  BEGIN_PAIRS_PER_TX,
+  DEPOSITS_PER_TX,
+  METADATA_MAX_NAME_LENGTH,
+  METADATA_MAX_SYMBOL_LENGTH,
+  METADATA_MAX_URI_LENGTH,
+  PROGRAM_ID,
+  TOKEN_METADATA_PROGRAM_ID,
+  WITHDRAWS_PER_TX,
+} from "./constants.js";
 import {
   createFundLookupTable,
   extendFundLookupTable,
@@ -56,6 +69,7 @@ import {
   pendingActionPda,
   randomNonce,
   redeemSessionPda,
+  tokenMetadataPda,
   type NonceLike,
 } from "./pda.js";
 import type { Fi6900 } from "./types/fi6900.js";
@@ -107,6 +121,50 @@ export interface TransferFeeInfo {
   maxFee: bigint;
 }
 
+/** Metaplex `DataV2` subset the index mint carries (`set_token_metadata`). */
+export interface TokenMetadataArgs {
+  /** <= 32 bytes */
+  name: string;
+  /** <= 10 bytes */
+  symbol: string;
+  /** <= 200 bytes; the off-chain JSON (image, description, ...) */
+  uri: string;
+}
+
+const utf8 = new TextEncoder();
+
+function assertTokenMetadataArgs(m: TokenMetadataArgs): void {
+  const n = utf8.encode(m.name).length;
+  const s = utf8.encode(m.symbol).length;
+  const u = utf8.encode(m.uri).length;
+  if (n === 0 || n > METADATA_MAX_NAME_LENGTH) throw new Error(`metadata name must be 1..${METADATA_MAX_NAME_LENGTH} bytes`);
+  if (s === 0 || s > METADATA_MAX_SYMBOL_LENGTH) throw new Error(`metadata symbol must be 1..${METADATA_MAX_SYMBOL_LENGTH} bytes`);
+  if (u > METADATA_MAX_URI_LENGTH) throw new Error(`metadata uri must be <= ${METADATA_MAX_URI_LENGTH} bytes`);
+}
+
+/**
+ * Payload commitment for `ActionKind.SetTokenMetadata`: sha256 over name, symbol and uri, each
+ * prefixed with its u32-LE byte length (programs/fi6900 `token_metadata_hash`). Uses Web Crypto,
+ * so it is async and works in browsers and Node >= 19.
+ */
+export async function tokenMetadataHash(m: TokenMetadataArgs): Promise<PublicKey> {
+  const parts = [m.name, m.symbol, m.uri].flatMap((v) => {
+    const bytes = utf8.encode(v);
+    const len = new Uint8Array(4);
+    new DataView(len.buffer).setUint32(0, bytes.length, true);
+    return [len, bytes];
+  });
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const buf = new Uint8Array(total);
+  let o = 0;
+  for (const p of parts) {
+    buf.set(p, o);
+    o += p.length;
+  }
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", buf);
+  return new PublicKey(new Uint8Array(digest));
+}
+
 /** Payload of a timelocked admin action (`queue_action(kind, key, values)`). */
 export interface ActionPayload {
   kind: ActionKind;
@@ -145,6 +203,8 @@ export const ActionPayloads = {
     key: PublicKey.default,
     values: V0(maxRefMoveBps, periodSlots),
   }),
+  /** `key` = `await tokenMetadataHash(args)`; executed with `setTokenMetadataIx(authority, args, action)`. */
+  setTokenMetadata: (payloadHash: PublicKey): ActionPayload => ({ kind: ActionKind.SetTokenMetadata, key: payloadHash, values: V0(0) }),
 };
 
 /**
@@ -239,6 +299,14 @@ export class Fi6900Client {
   }
   pendingActionPda(nonce: NonceLike): PublicKey {
     return pendingActionPda(this.fund, nonce, this.programId)[0];
+  }
+  /** Metaplex metadata PDA of the index mint. */
+  tokenMetadataPda(): PublicKey {
+    return tokenMetadataPda(this.indexMint)[0];
+  }
+  /** Metaplex metadata of the index mint (null until `set_token_metadata` has run). */
+  readTokenMetadata(): Promise<TokenMetadataAccount | null> {
+    return readTokenMetadata(this.connection, this.indexMint);
   }
   /** ATA holding index units for `owner` (index mint is a classic SPL Token mint). */
   indexAta(owner: PublicKey, indexTokenProgram: PublicKey = TOKEN_PROGRAM_ID): PublicKey {
@@ -381,6 +449,49 @@ export class Fi6900Client {
         tokenProgram: asset.tokenProgram,
       })
       .instruction();
+  }
+
+  /**
+   * Create (first call) or update the index mint's Metaplex metadata through the fund PDA. Direct
+   * while `fund.timelockSlots == 0n`; once the timelock is armed queue
+   * `ActionPayloads.setTokenMetadata(await tokenMetadataHash(args))` first and pass the due
+   * PendingAction here (its proposer receives the rent).
+   */
+  async setTokenMetadataIx(authority: PublicKey, args: TokenMetadataArgs, action?: PendingActionAccount | null): Promise<TransactionInstruction> {
+    assertTokenMetadataArgs(args);
+    return this.program.methods
+      .setTokenMetadata(args.name, args.symbol, args.uri)
+      .accountsStrict({
+        authority,
+        fund: this.fund,
+        indexMint: this.indexMint,
+        metadata: this.tokenMetadataPda(),
+        action: action?.address ?? null,
+        proposer: action?.proposer ?? null,
+        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .instruction();
+  }
+
+  /**
+   * Hand the index mint's existing metadata to the fund PDA: a plain mpl-token-metadata
+   * `UpdateMetadataAccountV2 { new_update_authority: fund }` signed by the CURRENT update authority
+   * (no program involvement). Needed once when the metadata was created before `initialize_fund`
+   * by a key other than the fund PDA (devnet fund-setup); afterwards `setTokenMetadataIx` updates it.
+   */
+  transferTokenMetadataAuthorityIx(currentUpdateAuthority: PublicKey, newUpdateAuthority: PublicKey = this.fund): TransactionInstruction {
+    // discriminator 15, data: None, new_update_authority: Some(pubkey), primary_sale_happened: None, is_mutable: None
+    const data = Buffer.concat([Buffer.from([15, 0, 1]), newUpdateAuthority.toBuffer(), Buffer.from([0, 0])]);
+    return new TransactionInstruction({
+      programId: TOKEN_METADATA_PROGRAM_ID,
+      keys: [
+        { pubkey: this.tokenMetadataPda(), isSigner: false, isWritable: true },
+        { pubkey: currentUpdateAuthority, isSigner: true, isWritable: false },
+      ],
+      data,
+    });
   }
 
   async proposeAuthorityIx(authority: PublicKey, newAuthority: PublicKey) {

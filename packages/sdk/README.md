@@ -15,10 +15,11 @@ both are copied from `target/` after `anchor build` + `anchor idl build`.
 | Export | What |
 |---|---|
 | `PROGRAM_ID` | Program id from the IDL (`Cdzgsq1LMMkqA7t69t1K4NCNDy27ZNhPfFgMNcVvRnCV`). |
-| `fundPda(indexMint)`, `assetPda(fund, mint)`, `mintSessionPda(fund, owner, nonce)`, `redeemSessionPda(...)`, `auctionPda(fund, nonce)`, `pendingActionPda(fund, nonce)` | PDA helpers returning `[PublicKey, bump]`. |
+| `fundPda(indexMint)`, `assetPda(fund, mint)`, `mintSessionPda(fund, owner, nonce)`, `redeemSessionPda(...)`, `auctionPda(fund, nonce)`, `pendingActionPda(fund, nonce)`, `tokenMetadataPda(mint)` | PDA helpers returning `[PublicKey, bump]` (`tokenMetadataPda` is the Metaplex metadata PDA under `TOKEN_METADATA_PROGRAM_ID`). |
 | `readFund`, `readAssets`, `readActiveAssets`, `readAuctions`, `readMintSession`, `readRedeemSession`, `readMintSessions`, `readRedeemSessions`, `readPendingActions`, `readPendingAction` | Account readers (bigint fields; the `[u64; 8]` bitmaps are one 512-bit `bigint`, `bitmapSlots()` lists the set slots). `decode*` variants take raw bytes. |
 | `Fi6900Client` | Wraps the Anchor `Program`. One `*Ix` method per instruction, returning `TransactionInstruction`. `buildMintTxs` / `buildRedeemTxs` / `buildCancelMintTxs` return ordered `VersionedTransaction[]` (chunked `begin_*` hidden). `quoteMint` / `quoteRedeem` compute baskets off-chain with the exact program math. |
 | `ActionPayloads`, `ActionKind`, `ACTION_KIND_NAMES` | Payload builders for every timelocked admin action (`queueActionIx`). |
+| `readTokenMetadata(connection, mint)`, `decodeTokenMetadata`, `tokenMetadataHash({ name, symbol, uri })` | Metaplex metadata of the index mint (name / symbol / uri / updateAuthority / isMutable; `null` until set) and the sha256 payload commitment used as the `SetTokenMetadata` action key (Web Crypto, async). |
 | `createFundLookupTable`, `extendFundLookupTables`, `extendFundLookupTable` | Plan address lookup table(s) with the fund, all Asset PDAs, vaults, mints and programs — one table per 256 addresses. |
 | `pricing`: `toQ64`, `fromQ64`, `q64ToDecimalString`, `auctionPriceAt(auction, slot)`, `buyAmountFor`, `linearPrice`, `mulDivCeil`, `mulDivFloor`, `feeAmount`, `mgmtFeeUnits`, `humanPriceToQ64`, `usdToRefPriceQ64`, `refPriceQ64ToUsd`, `fairPriceQ64`, `minEndPriceQ64`, `moveBps`, `maxRefPriceDelta`, `clampRefPrice`, `effectiveRefAnchor` | Pure integer math mirroring `programs/fi6900/src/math.rs` and `governance.rs`. |
 | constants | `MAX_ASSETS` (512), `BEGIN_PAIRS_PER_TX` (50), `MAX_FINALIZE_ASSETS` (118), `DEPOSITS_PER_TX` (6), `WITHDRAWS_PER_TX` (8), `ALT_MAX_ADDRESSES` (256), `REF_PRICE_NUMERAIRE_USD` (1e-9), `MAINNET_TIMELOCK_SLOTS` (432000), pause bits, enums. |
@@ -95,7 +96,21 @@ for (const a of await client.readDueActions()) await send(await client.executeAc
 await send(await client.cancelActionIx(authority, pending)); // authority only
 ```
 
-The direct setters (`setFeesIx`, `setTargetWeightIx`, `setRebalancerIx`, `setFeeRecipientIx`, `addAssetIx`, `beginRemoveAssetIx`, `setTimelockIx`, `setAuctionParamsIx`) only work while `fund.timelockSlots == 0n`.
+The direct setters (`setFeesIx`, `setTargetWeightIx`, `setRebalancerIx`, `setFeeRecipientIx`, `addAssetIx`, `beginRemoveAssetIx`, `setTimelockIx`, `setAuctionParamsIx`, `setTokenMetadataIx`) only work while `fund.timelockSlots == 0n`.
+
+### Token metadata (Metaplex)
+
+```ts
+const args = { name: "FIX6900 Index", symbol: "FIXIDX", uri: "https://fix6900index.com/token/fix6900-index.json" };
+await send(await client.setTokenMetadataIx(authority, args));            // timelock 0: creates or updates the metadata PDA
+console.log(await client.readTokenMetadata());                           // { name, symbol, uri, updateAuthority: fund PDA, isMutable: true }
+
+// timelock armed: queue the payload hash, then execute with the same strings (the authority signs; the action's rent goes to its proposer)
+const q = await client.queueActionIx(authority, ActionPayloads.setTokenMetadata(await tokenMetadataHash(args)));
+// ... after the eta:
+const pending = (await client.readPendingActions()).find((a) => a.address.equals(q.action))!;
+await send(await client.setTokenMetadataIx(authority, args, pending));
+```
 
 ### Lookup tables
 

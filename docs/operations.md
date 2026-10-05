@@ -32,6 +32,7 @@ pnpm --filter @fi6900/keeper keeper init-fund --sol 25 [--dry] [--timelock 0]   
 
 # governance / index committee
 pnpm --filter @fi6900/keeper keeper governance                      # timelock, pending actions, authorities, upgrade authority
+pnpm --filter @fi6900/keeper keeper set-metadata --dry              # Metaplex name/symbol/uri of the index mint (defaults TOKEN_NAME/TOKEN_SYMBOL/TOKEN_URI; --name/--symbol/--uri override)
 pnpm --filter @fi6900/keeper keeper proposals [--status proposed]   # reconstitution proposals
 pnpm --filter @fi6900/keeper keeper approve <mint> [--weight bps] [--immediate]
 pnpm --filter @fi6900/keeper keeper reject <mint> [--note "..."]
@@ -74,6 +75,7 @@ All variables are validated with zod on boot (`src/config/env.ts`); invalid valu
 | `NAV_SNAPSHOT_SEC`, `REBALANCE_CHECK_SEC`, `ACTION_EXECUTE_SEC`, `AUCTION_MONITOR_SEC`, `AP_CHECK_SEC`, `DIST_INTERVAL_MIN`, `METHODOLOGY_CRON`, `FEE_PROCESS_CRON` | 60 / 60 / 60 / 15 / 30 / 15 / `5 0 * * *` / `0 * * * *` | job cadence |
 | `AP_THRESHOLD_BPS`, `AP_NOTIONAL_SOL`, `AP_MAX_NOTIONAL_SOL_PER_CYCLE`, `AP_SLIPPAGE_BPS`, `KILL_SWITCH` | 75 / 2 / 10 / 100 / false | AP arbitrage bounds |
 | `MIN_CLAIM_SOL`, `AIRDROP_BATCH_SIZE`, `AIRDROP_DENYLIST`, `ATA_RENT_LAMPORTS`, `FEE_BURN_PCT` | 0.05 / 18 / — / 2039280 / 75 | flywheel |
+| `TOKEN_NAME`, `TOKEN_SYMBOL`, `TOKEN_URI` | `FIX6900 Index`, `FIXIDX`, `https://fix6900index.com/token/fix6900-index.json` | Metaplex metadata the `set-metadata` command writes for the index mint (32 / 10 / 200 bytes). The JSON + 512×512 PNG live in `apps/web-v2/public/token/`. With the timelock armed the command looks for a due `set_token_metadata` action whose key is the payload hash (`chain.tokenMetadataHash`) and executes it; queue it first with `ActionPayloads.setTokenMetadata(hash)` |
 | `FEE_RESERVED_UNITS` | `0` | raw index units held by the keeper (fee_recipient) that are **not** fees - the bootstrap seed printed by `init-fund`. `fee-processing` redeems only `balance - reserved` |
 | `WEIGHTING_SCHEME`, `REBALANCE_INTERVAL_DAYS`, `DRIFT_RELATIVE_BPS`, `MAX_TRADE_PCT_DAILY_VOLUME` | equal / 7 / 5000 / 5 | methodology overrides (`DRIFT_RELATIVE_BPS` 5000 = rebalance when a weight is >50% above/below its target) |
 

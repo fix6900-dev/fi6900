@@ -26,6 +26,8 @@ export const payloads = {
   addAsset: (mint: string, weightBps: number): ActionPayload => ({ kind: ActionKind.AddAsset, key: mint, values: v4(weightBps) }),
   beginRemoveAsset: (mint: string): ActionPayload => ({ kind: ActionKind.BeginRemoveAsset, key: mint, values: v4() }),
   setRefMovePolicy: (maxRefMoveBps: number, periodSlots: bigint | number): ActionPayload => ({ kind: ActionKind.SetRefMovePolicy, key: DEFAULT_KEY, values: v4(maxRefMoveBps, periodSlots) }),
+  /** `payloadHash` = `chain.tokenMetadataHash({ name, symbol, uri })`; executed by `keeper set-metadata` with the same strings. */
+  setTokenMetadata: (payloadHash: string): ActionPayload => ({ kind: ActionKind.SetTokenMetadata, key: payloadHash, values: v4() }),
 };
 
 /** Human-readable payload for logs / API. */
@@ -51,6 +53,8 @@ export function describePayload(kind: number, key: string, values: readonly bigi
       return { mint: key };
     case ActionKind.SetRefMovePolicy:
       return { maxRefMoveBps: Number(values[0]), refMovePeriodSlots: (values[1] ?? 0n).toString() };
+    case ActionKind.SetTokenMetadata:
+      return { payloadHash: key };
     default:
       return { key, values: values.map((v) => v.toString()) };
   }

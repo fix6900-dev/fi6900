@@ -167,6 +167,10 @@ export const EnvSchema = z.object({
    * minted to the keeper by `init-fund`). Fee processing only redeems balance - reserved.
    */
   FEE_RESERVED_UNITS: z.string().regex(/^\d+$/, 'must be a non-negative integer (raw units)').default('0'),
+  // Metaplex metadata of the index mint (`keeper set-metadata`; flags override these)
+  TOKEN_NAME: z.string().default('FIX6900 Index'),
+  TOKEN_SYMBOL: z.string().default('FIXIDX'),
+  TOKEN_URI: z.string().default('https://fix6900index.com/token/fix6900-index.json'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
