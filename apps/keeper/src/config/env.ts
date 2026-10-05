@@ -131,6 +131,8 @@ export const EnvSchema = z.object({
   PUMP_SWEEP_ENABLED: bool(true),
   /** Minimum PUMP (UI amount) in the dev wallet before a sweep. */
   PUMP_SWEEP_MIN: numEnv(1000, 0),
+  /** Max PUMP (UI) per sweep swap; large single swaps route through too many accounts to fit a transaction. */
+  PUMP_SWEEP_CHUNK: numEnv(40_000, 1),
   /** Keeper working-capital ceiling (SOL). Each flywheel round recycles any excess above it into the 50/50 split. */
   KEEPER_SOL_CEILING: numEnv(1, 0),
   /** What the non-airdrop half of each round does: 'lp' = permanent Index/SOL liquidity, 'burn' = buy $FIX6900 on the market and burn it. */

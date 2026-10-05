@@ -99,12 +99,24 @@ export class Flywheel {
         const pumpRaw = legacyBal + t22Bal;
         const pumpUi = Number(pumpRaw) / 1e6; // $PUMP has 6 decimals
         if (pumpUi >= this.d.env.PUMP_SWEEP_MIN && pumpRaw > 0n) {
-          const q = await this.d.quotes.quote({ inputMint: pumpMint.toBase58(), outputMint: WSOL_MINT, amount: pumpRaw, slippageBps: this.d.env.AP_SLIPPAGE_BPS });
-          const sig = dry ? DRY_RUN_SIG : await this.d.devTx.sendVersioned(await this.d.quotes.swapTx(q, this.d.devWallet.toBase58()), { label: 'sweep PUMP rewards -> SOL' });
-          claimed += q.outAmount;
-          this.d.repo.insertFlywheelEvent({ kind: 'claim', sig, amounts: { sol: Number(q.outAmount) / 1e9, lamports: q.outAmount, pump: pumpUi }, note: 'pump.fun creator rewards paid in $PUMP, swept to SOL' });
-          this.d.events.emit('flywheel_event', { kind: 'claim', sol: Number(q.outAmount) / 1e9 });
-          log.info({ pump: pumpUi, sol: Number(q.outAmount) / 1e9, sig }, 'PUMP creator rewards swept to SOL');
+          // Chunked: one big swap routes through too many accounts and overflows the transaction size limit.
+          const chunk = uiToBigint(this.d.env.PUMP_SWEEP_CHUNK, 6);
+          let left = pumpRaw;
+          let sweptSol = 0n;
+          const sigs: string[] = [];
+          while (left > 0n) {
+            const amt = left > chunk ? chunk : left;
+            const q = await this.d.quotes.quote({ inputMint: pumpMint.toBase58(), outputMint: WSOL_MINT, amount: amt, slippageBps: this.d.env.AP_SLIPPAGE_BPS, maxAccounts: 40 });
+            const sig = dry ? DRY_RUN_SIG : await this.d.devTx.sendVersioned(await this.d.quotes.swapTx(q, this.d.devWallet.toBase58()), { label: `sweep PUMP -> SOL (${Number(amt) / 1e6})` });
+            sigs.push(sig);
+            sweptSol += q.outAmount;
+            left -= amt;
+            if (dry && left > 0n) { sweptSol += (q.outAmount * left) / amt; break; }
+          }
+          claimed += sweptSol;
+          this.d.repo.insertFlywheelEvent({ kind: 'claim', sig: sigs[0] ?? DRY_RUN_SIG, amounts: { sol: Number(sweptSol) / 1e9, lamports: sweptSol, pump: pumpUi, swaps: sigs }, note: 'pump.fun creator rewards paid in $PUMP, swept to SOL' });
+          this.d.events.emit('flywheel_event', { kind: 'claim', sol: Number(sweptSol) / 1e9 });
+          log.info({ pump: pumpUi, sol: Number(sweptSol) / 1e9, swaps: sigs.length }, 'PUMP creator rewards swept to SOL');
         } else if (pumpUi > 0) {
           log.info({ pump: pumpUi, min: this.d.env.PUMP_SWEEP_MIN }, 'PUMP rewards below sweep threshold');
         }
@@ -237,10 +249,43 @@ export class Flywheel {
     if (fund.openAuctions > 0) throw new Error('auctions open; cannot begin_mint');
     const basket = creationBasket(nav.assets, units, nav.nav.supply);
     const sigs: string[] = [];
+    const priceOf = (mint: string): number => nav.nav.holdings.find((h) => h.mint === mint)?.priceUsd ?? 0;
+    const decimalsOf = (mint: string): number => nav.assets.find((a) => a.mint === mint)?.decimals ?? 6;
+    const held = async (mint: string): Promise<bigint> => {
+      const a = nav.assets.find((x) => x.mint === mint);
+      if (!a || !this.d.balances) return 0n;
+      return this.d.balances.getTokenBalance(this.d.devWallet, new PublicKey(mint), new PublicKey(a.tokenProgram)).catch(() => 0n);
+    };
+    const buyLeg = async (mint: string, needed: bigint, label: string): Promise<void> => {
+      const pay = this.d.devWallet.toBase58();
+      try {
+        const q = await this.d.quotes.quote({ inputMint: WSOL_MINT, outputMint: mint, amount: needed, slippageBps: this.d.env.AP_SLIPPAGE_BPS, swapMode: 'ExactOut', maxAccounts: 40 });
+        sigs.push(await this.d.devTx.sendVersioned(await this.d.quotes.swapTx(q, pay), { label }));
+        return;
+      } catch (err) {
+        log.warn({ mint, err: (err as Error).message }, 'ExactOut route unavailable; falling back to ExactIn with headroom');
+      }
+      // ExactIn fallback: size the SOL by price with 4% headroom (excess tokens simply stay in the dev wallet).
+      const usd = (Number(needed) / 10 ** decimalsOf(mint)) * priceOf(mint);
+      if (!(usd > 0) || !(solUsd > 0)) throw new Error(`no price for ${mint}; cannot size ExactIn fallback`);
+      const lamports = uiToBigint((usd / solUsd) * 1.04, 9);
+      const q = await this.d.quotes.quote({ inputMint: WSOL_MINT, outputMint: mint, amount: lamports, slippageBps: this.d.env.AP_SLIPPAGE_BPS, maxAccounts: 40 });
+      sigs.push(await this.d.devTx.sendVersioned(await this.d.quotes.swapTx(q, pay), { label: `${label} (ExactIn)` }));
+    };
     for (const leg of basket) {
       if (leg.amount === 0n) continue;
-      const q = await this.d.quotes.quote({ inputMint: WSOL_MINT, outputMint: leg.mint, amount: leg.amount, slippageBps: this.d.env.AP_SLIPPAGE_BPS, swapMode: 'ExactOut' });
-      sigs.push(await this.d.devTx.sendVersioned(await this.d.quotes.swapTx(q, this.d.devWallet.toBase58()), { label: `flywheel buy ${leg.mint}` }));
+      const have = await held(leg.mint);
+      if (have >= leg.amount) continue; // leftover from a previous round covers it
+      await buyLeg(leg.mint, leg.amount - have, `flywheel buy ${leg.mint}`);
+    }
+    // Verify every leg before minting; top up any shortfall (ExactIn rounding) once.
+    for (const leg of basket) {
+      if (leg.amount === 0n) continue;
+      const have = await held(leg.mint);
+      if (have < leg.amount) {
+        log.warn({ mint: leg.mint, have: have.toString(), need: leg.amount.toString() }, 'leg short after purchase; topping up');
+        await buyLeg(leg.mint, ((leg.amount - have) * 110n) / 100n, `flywheel top-up ${leg.mint}`);
+      }
     }
     const txs = await this.d.chain.buildMintTxs(units, this.d.devWallet);
     sigs.push(...(await this.d.devTx.sendMany(txs, { label: 'flywheel mint' })));

@@ -109,7 +109,7 @@ export interface SwapQuote {
 }
 
 export interface QuoteSource {
-  quote(p: { inputMint: string; outputMint: string; amount: bigint; slippageBps: number; swapMode?: 'ExactIn' | 'ExactOut' }): Promise<SwapQuote>;
+  quote(p: { inputMint: string; outputMint: string; amount: bigint; slippageBps: number; swapMode?: 'ExactIn' | 'ExactOut'; maxAccounts?: number }): Promise<SwapQuote>;
   /** Builds an unsigned swap transaction for `user`. */
   swapTx(quote: SwapQuote, user: string): Promise<VersionedTransaction>;
 }

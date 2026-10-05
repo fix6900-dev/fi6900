@@ -65,6 +65,7 @@ export class JupiterQuoteSource implements QuoteSource {
     amount: bigint;
     slippageBps: number;
     swapMode?: 'ExactIn' | 'ExactOut';
+    maxAccounts?: number;
   }): Promise<SwapQuote> {
     const params = new URLSearchParams({
       inputMint: p.inputMint,
@@ -74,6 +75,7 @@ export class JupiterQuoteSource implements QuoteSource {
       swapMode: p.swapMode ?? 'ExactIn',
       restrictIntermediateTokens: 'true',
     });
+    if (p.maxAccounts) params.set('maxAccounts', String(p.maxAccounts));
     const url = `${this.swapBase}/quote?${params.toString()}`;
     return this.cache.getOrLoad(url, async () => parseQuote(await this.limiter.run(() => fetchJson<JupQuoteResponse>(url, { retries: 2, headers: this.headers }))));
   }
