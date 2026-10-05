@@ -37,7 +37,7 @@ import {
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { createLiveContext, registerJobs, type LiveContext } from './app.js';
-import { buildCreateIndexSolPool } from './flywheel/lp.js';
+import { buildCreateIndexSolPool, MeteoraLpProvider, readPool } from './flywheel/lp.js';
 import { extractCommitteeNotes, renderLaunchReport, type CgTopRow, type SeedImpact } from './methodology/launch-report.js';
 import { runMethodology } from './methodology/run.js';
 import { INDEX_DECIMALS } from './nav/compute.js';
@@ -378,6 +378,34 @@ async function createPool(flags: Record<string, string | boolean>): Promise<void
   });
 }
 
+/**
+ * keeper add-liquidity --units N [--max-sol X] [--dry]
+ * Adds a full-range position to METEORA_POOL from the keeper wallet at the pool's current price. SOL needed is read
+ * from the live pool ratio (+1% buffer); refuses to take the keeper below AP_MIN_SOL_RESERVE.
+ */
+async function addLiquidity(flags: Record<string, string | boolean>): Promise<void> {
+  const units = typeof flags.units === 'string' ? Number(flags.units) : 0;
+  if (!(units > 0)) throw new Error('pass --units <index units>');
+  await withCtx(flags, async (ctx) => {
+    if (!ctx.env.METEORA_POOL) throw new Error('METEORA_POOL not set');
+    const pool = new PublicKey(ctx.env.METEORA_POOL);
+    const st = await readPool(ctx.connection, pool, INDEX_DECIMALS, 9);
+    const ratio = Number(st.tokenBVaultAmount) / Number(st.tokenAVaultAmount); // lamports per raw unit
+    const indexAmount = uiToBigint(units, INDEX_DECIMALS);
+    const solLamports = BigInt(Math.ceil(Number(indexAmount) * ratio * 1.01));
+    const maxSol = typeof flags['max-sol'] === 'string' ? Number(flags['max-sol']) : Infinity;
+    const solBal = Number(await ctx.balances.getSolBalance(ctx.keeper.publicKey)) / 1e9;
+    const need = Number(solLamports) / 1e9;
+    logger.info({ pool: pool.toBase58(), units, poolPriceSolPerUnit: st.priceAinB, solNeeded: need, keeperSol: solBal, reserve: ctx.env.AP_MIN_SOL_RESERVE }, 'add-liquidity plan');
+    if (need > maxSol) throw new Error(`needs ${need.toFixed(3)} SOL > --max-sol ${maxSol}`);
+    if (solBal - need < ctx.env.AP_MIN_SOL_RESERVE) throw new Error(`would leave keeper with ${(solBal - need).toFixed(3)} SOL < reserve ${ctx.env.AP_MIN_SOL_RESERVE}; lower --units`);
+    const lp = new MeteoraLpProvider(ctx.connection, ctx.tx, pool, ctx.chain.indexMint);
+    const r = await lp.addLiquidity({ owner: ctx.keeper.publicKey, indexAmount, solLamports });
+    ctx.repo.insertFlywheelEvent({ kind: 'add_lp', sig: r.sigs[0] ?? DRY_RUN_SIG, amounts: { units: indexAmount, sol: solLamports, position: r.position, source: 'keeper seed' }, note: 'manual liquidity seed from keeper inventory' });
+    print({ sigs: r.sigs, position: r.position, units, solIn: need, poolPriceSolPerUnit: st.priceAinB, dry: ctx.tx.dryRun });
+  });
+}
+
 /** First non-flag argument after the command. */
 function positional(argv: string[]): string | undefined {
   const rest = argv.slice(1);
@@ -498,6 +526,8 @@ async function cli(argv: string[]): Promise<void> {
       return launchReport(flags);
     case 'create-pool':
       return createPool(flags);
+    case 'add-liquidity':
+      return addLiquidity(flags);
     case 'jobs':
       return withCtx(flags, async (ctx) => {
         registerJobs(ctx);
@@ -508,6 +538,7 @@ async function cli(argv: string[]): Promise<void> {
         [
           'keeper <command> [flags]',
           '  init-fund [--sol <amount>] [--basket <json>] [--resume <index mint>] [--dry]',
+          '  add-liquidity --units <n> [--max-sol <x>] [--dry]',
           '  run',
           '  methodology [--dry]',
           '  rebalance [--dry] [--force]',
