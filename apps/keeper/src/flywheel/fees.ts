@@ -70,9 +70,12 @@ export class FeeProcessor {
     // seed units minted to the keeper at launch) must never be redeemed by this job.
     const held = await this.d.balances.getTokenBalance(this.d.tx.payer, this.d.chain.indexMint);
     const reserved = BigInt(this.d.env.FEE_RESERVED_UNITS);
-    const units = held > reserved ? held - reserved : 0n;
+    // Units the AP bought below NAV and still holds as inventory are not fees either.
+    const inventory = this.d.repo.apInventoryUnits();
+    const excluded = reserved + inventory;
+    const units = held > excluded ? held - excluded : 0n;
     const minUnits = opts.minUnits ?? 1_000_000n; // 1 unit
-    if (units < minUnits) return none(`fee units ${units} (held ${held}, reserved ${reserved}) below minimum ${minUnits}`);
+    if (units < minUnits) return none(`fee units ${units} (held ${held}, reserved ${reserved}, ap inventory ${inventory}) below minimum ${minUnits}`);
 
     const payer = this.d.tx.payer.toBase58();
     if (dry) {

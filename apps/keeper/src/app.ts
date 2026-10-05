@@ -180,7 +180,7 @@ export function registerJobs(ctx: LiveContext): void {
     const fw = ctx.flywheel;
     scheduler.addInterval('flywheel', env.DIST_INTERVAL_MIN * 60_000, () => fw.runCycle(), { runImmediately: env.FLYWHEEL_RUN_ON_BOOT });
   }
-  scheduler.addCron('fee-processing', env.FEE_PROCESS_CRON, async () => {
+  if (env.FEE_PROCESS_ENABLED) scheduler.addCron('fee-processing', env.FEE_PROCESS_CRON, async () => {
     ctx.ap.resetCycleBudget();
     return ctx.fees.run();
   });

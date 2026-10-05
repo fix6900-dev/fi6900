@@ -142,6 +142,8 @@ export const EnvSchema = z.object({
 
   // ---- flywheel ----
   FLYWHEEL_ENABLED: bool(true),
+  /** Hourly fee processing (redeem fee units -> sell basket -> buyback/burn + treasury). false pauses it entirely. */
+  FEE_PROCESS_ENABLED: bool(true),
   MIN_CLAIM_SOL: numEnv(0.05, 0),
   /** pump.fun pays creator rewards in $PUMP (2026). Any PUMP in the dev wallet is swept to SOL and treated as claimed fees. */
   PUMP_REWARD_MINT: z.string().default('pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn'),

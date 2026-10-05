@@ -303,6 +303,26 @@ export class Repo {
   }
 
   /** Sum of a numeric field across events of a kind (sig != dry-run optional). */
+  /**
+   * Index units the AP currently holds as arbitrage inventory: confirmed inventory buys (kind 'redeem',
+   * amounts.inventory) minus confirmed inventory sells (kind 'create', amounts.inventory). The fee job must not
+   * treat these keeper-held units as fees.
+   */
+  apInventoryUnits(): bigint {
+    const rows = this.db
+      .prepare<[], { kind: string; amounts: string }>("SELECT kind, amounts FROM flywheel_events WHERE kind IN ('redeem','create') AND sig NOT IN ('dry-run','failed')")
+      .all();
+    let net = 0n;
+    for (const r of rows) {
+      const a = parseJson<Record<string, unknown>>(r.amounts, {});
+      if (!a.inventory) continue;
+      const u = a.units;
+      const units = typeof u === 'string' || typeof u === 'number' ? BigInt(u) : 0n;
+      net += r.kind === 'redeem' ? units : -units;
+    }
+    return net > 0n ? net : 0n;
+  }
+
   sumFlywheel(kind: FlywheelKind, field: string): number {
     const rows = this.db.prepare<[string], { amounts: string }>('SELECT amounts FROM flywheel_events WHERE kind = ?').all(kind);
     let s = 0;
