@@ -51,11 +51,11 @@ export function Hero() {
   return (
     <section className="hero" aria-labelledby="hero-title">
       <h1 id="hero-title" className="sr-only">
-        FI6900 Solana Memecoin Equal Weight Index
+        FIX6900 Solana Memecoin Equal Weight Index
       </h1>
       <div className="quote-band micro">
         <span>
-          FI6900 Solana Memecoin Equal Weight Index
+          FIX6900 Solana Memecoin Equal Weight Index
           <span className="qb-lvl"> · Level{offMainnet ? ` · ${env.cluster === "devnet" ? "Devnet" : env.cluster}` : ""}
           {demo ? " · Sample data" : ""}</span>
         </span>
@@ -80,7 +80,7 @@ export function Hero() {
         </div>
         <div className="cta">
           <Link href="/buy" className="btn btn-primary btn-lg">
-            Buy $FI6900
+            Buy $FIX6900
           </Link>
           <Link href="/verify" className="btn btn-secondary btn-lg">
             Verify holdings

@@ -37,7 +37,7 @@ export function FlywheelSection() {
           <div>
             <dt className="micro muted">Units airdropped</dt>
             <dd>
-              <Figure value={data?.airdroppedUnits} format={(n) => compact(n, 2)} /> <span className="unit">$FI6900</span>
+              <Figure value={data?.airdroppedUnits} format={(n) => compact(n, 2)} /> <span className="unit">FIX6900 Index</span>
             </dd>
           </div>
           <div>

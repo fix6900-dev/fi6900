@@ -59,7 +59,7 @@ export function FlywheelView() {
   const notes: Note[] = [
     { label: "Creator fees claimed by the keeper from pump.fun and PumpSwap", source: "keeper ledger, tx signatures in the event feed" },
     { label: "Liquidity added to the FI6900/SOL pool", source: "keeper ledger" },
-    { label: "FI6900 units minted from fee SOL and airdropped to $FIX6900 holders", source: "keeper ledger" },
+    { label: "FIX6900 units minted from fee SOL and airdropped to $FIX6900 holders", source: "keeper ledger" },
     { label: "$FIX6900 bought with 75% of index fees and burned", source: "keeper ledger" },
   ];
 

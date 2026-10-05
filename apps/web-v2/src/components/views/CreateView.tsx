@@ -173,7 +173,7 @@ export function CreateView() {
             <div className="panel-b">
               <label className="field field-lg">
                 <input inputMode="decimal" value={unitsStr} onChange={(e) => setUnitsStr(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Units" placeholder="0" />
-                <span className="muted">FI6900</span>
+                <span className="muted">FIX6900</span>
               </label>
               <div className="quick">
                 {[10, 100, 1000, 10000].map((v) => (

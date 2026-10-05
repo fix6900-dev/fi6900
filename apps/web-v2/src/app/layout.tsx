@@ -15,11 +15,11 @@ const DESC = "An on-chain, equal-weight memecoin index fund on Solana. Mintable,
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
-  title: { default: "FI6900 Solana Memecoin Equal Weight Index", template: "%s · FI6900" },
+  title: { default: "FIX6900 Solana Memecoin Equal Weight Index", template: "%s · FIX6900" },
   description: DESC,
-  applicationName: "FI6900",
-  openGraph: { type: "website", siteName: "FI6900", title: "FI6900 Solana Memecoin Equal Weight Index", description: DESC, url: SITE },
-  twitter: { card: "summary_large_image", title: "FI6900 Solana Memecoin Equal Weight Index", description: DESC },
+  applicationName: "FIX6900",
+  openGraph: { type: "website", siteName: "FIX6900", title: "FIX6900 Solana Memecoin Equal Weight Index", description: DESC, url: SITE },
+  twitter: { card: "summary_large_image", title: "FIX6900 Solana Memecoin Equal Weight Index", description: DESC },
   icons: { icon: "/icon.svg" },
 };
 

@@ -40,7 +40,7 @@ export function VerifyView() {
   const cluster = env.cluster === "mainnet-beta" ? "" : ` --url ${env.cluster === "localnet" ? "localhost" : env.cluster}`;
 
   const rows: { k: string; v: React.ReactNode; note?: React.ReactNode }[] = [
-    { k: "Program id", v: programId ? <Address value={programId} full /> : UNSET, note: "The FI6900 program. All vault and mint authority derives from it." },
+    { k: "Program id", v: programId ? <Address value={programId} full /> : UNSET, note: "The FIX6900 program. All vault and mint authority derives from it." },
     { k: "Fund PDA", v: data ? <Address value={data.fundPda} full /> : UNSET, note: <>Derivation: <span className="m">seeds = [&quot;fund&quot;, index_mint]</span></> },
     { k: "Index mint", v: data ? <Address value={data.indexMint} kind="token" full /> : UNSET },
     { k: "Mint authority", v: data ? <Address value={data.mintAuthority} full /> : UNSET },

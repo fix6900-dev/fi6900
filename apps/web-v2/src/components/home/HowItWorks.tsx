@@ -36,7 +36,7 @@ export function HowItWorks() {
           </span>
           <div className="how-body">
             <h3 className="h3">Creation and redemption in‑kind</h3>
-            <p className="prose">FI6900 is an index fund that works the way SPY works, on-chain. Deposit the basket and mint units. Burn units and withdraw your pro-rata slice of every coin. Units are redeemable in-kind for a pro-rata share of the vault.</p>
+            <p className="prose">FIX6900 is an index fund that works the way SPY works, on-chain. Deposit the basket and mint units. Burn units and withdraw your pro-rata slice of every coin. Units are redeemable in-kind for a pro-rata share of the vault.</p>
           </div>
           <div className="how-fig m" aria-label="Creation and redemption flow">
             <span className="how-fig-k micro muted">Flow</span>

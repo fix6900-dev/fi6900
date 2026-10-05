@@ -90,7 +90,7 @@ export function MethodologyView() {
 
   return (
     <div className="page pagebody">
-      <PageHeader eyebrow={`Index methodology · version ${version}`} title="FI6900 Solana Memecoin Equal Weight Index" desc={`The index measures ${held != null ? `the ${held} eligible` : "eligible"} Solana memecoins currently held at equal weight. The rulebook below is read live from the keeper configuration, so the numbers in the margin are the numbers in force.`} />
+      <PageHeader eyebrow={`Index methodology · version ${version}`} title="FIX6900 Solana Memecoin Equal Weight Index" desc={`The index measures ${held != null ? `the ${held} eligible` : "eligible"} Solana memecoins currently held at equal weight. The rulebook below is read live from the keeper configuration, so the numbers in the margin are the numbers in force.`} />
 
       <div className="doc">
         <nav className="toc" aria-label="Contents">

@@ -95,7 +95,7 @@ export function Footer() {
             <h2 id="ft-notes" className="micro ft-h">
               Notes
             </h2>
-            <p className="prose-sm">$FI6900 is redeemable in-kind for a pro-rata share of the vault. $FIX6900 is the governance and fee token. Nothing on this site is a promise of returns.</p>
+            <p className="prose-sm">FIX6900 Index is redeemable in-kind for a pro-rata share of the vault. $FIX6900 is the governance and fee token. Nothing on this site is a promise of returns.</p>
           </section>
         </div>
       </div>

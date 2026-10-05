@@ -50,7 +50,7 @@ export function VerifyStrip() {
             <span className="micro muted">Program id</span>
           </div>
           <p className="vcol-t">{programId ? <Address value={programId} head={6} tail={6} /> : "—"}</p>
-          <p className="faint">The FI6900 program. Open source.</p>
+          <p className="faint">The FIX6900 program. Open source.</p>
         </div>
         <div className="vcol">
           <div className="vcol-h">

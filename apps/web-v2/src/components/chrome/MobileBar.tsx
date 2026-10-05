@@ -27,7 +27,7 @@ export function MobileBar() {
   return (
     <div className="mobilebar" role="region" aria-label="Quick actions">
       <Link href="/buy" className="btn btn-primary btn-lg">
-        Buy $FI6900
+        Buy $FIX6900
       </Link>
       <Link href="/verify" className="btn btn-secondary btn-lg">
         Verify

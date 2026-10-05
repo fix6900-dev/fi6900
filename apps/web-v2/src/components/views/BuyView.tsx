@@ -24,6 +24,8 @@ declare global {
 }
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
+/** $FIX6900, the pump.fun governance and fee token. */
+const FIX6900_MINT = "6nHAaiY8Lvwx5AAbVaxHAZgYkVJHv2cqrt6juHuJtVi5";
 const money = (n: number) => "$" + n.toFixed(4);
 
 function Fallback({ mint }: { mint: string }) {
@@ -64,7 +66,7 @@ function JupiterTerminal({ outputMint }: { outputMint: string }) {
           endpoint: env.rpcUrl,
           strictTokenList: false,
           defaultExplorer: "Solscan",
-          // Both directions: $FI6900 is the initial output, but neither side is fixed, so the user can flip to sell units for SOL.
+          // Both directions: the chosen token is the initial output, but neither side is fixed, so the user can flip to sell units for SOL.
           formProps: { initialInputMint: SOL_MINT, initialOutputMint: outputMint, swapMode: "ExactIn" },
           containerStyles: { background: "transparent", borderRadius: "0" },
         });
@@ -109,27 +111,41 @@ export function BuyView() {
   const { data: fund } = useFund();
   const asOf = useAsOf();
   const clock = asOf ? `${utcClock(asOf)} UTC` : undefined;
-  const outputMint = env.indexMint || fund?.indexMint || "";
+  const coinMint = env.coinMint || FIX6900_MINT;
+  const indexMint = env.indexMint || fund?.indexMint || "";
+  const [target, setTarget] = useState<"coin" | "index">("coin");
+  const outputMint = target === "coin" ? coinMint : indexMint;
+  const sym = target === "coin" ? "$FIX6900" : "FIX6900 Index units";
   const premium = fund?.premiumBps ?? null;
   const warn = premium != null && premium > 150;
   const mainnet = env.cluster === "mainnet-beta";
 
   return (
     <div className="page pagebody">
-      <PageHeader eyebrow="Buy" title="Buy $FI6900." desc="Swap SOL for index units on Jupiter, or flip the pair to sell units back to SOL. If the market trades well above NAV, creating units in-kind is cheaper; well below, redeeming in-kind is." />
+      <PageHeader eyebrow="Buy" title="Buy $FIX6900." desc="Swap SOL for $FIX6900, the governance and fee token, on Jupiter. You can also swap for FIX6900 Index units, which are redeemable in-kind for a pro-rata share of the vault." />
+
+      <div className="tabs" role="tablist" aria-label="Token">
+        <button type="button" role="tab" aria-selected={target === "coin"} className={`tab${target === "coin" ? " is-active" : ""}`} onClick={() => setTarget("coin")}>
+          $FIX6900
+        </button>
+        <button type="button" role="tab" aria-selected={target === "index"} className={`tab${target === "index" ? " is-active" : ""}`} onClick={() => setTarget("index")}>
+          Index units
+        </button>
+      </div>
 
       <div className="split">
         <section className="split-main" aria-label="Swap">
           <div className="panel-h">
-            <span className="micro muted">Jupiter Terminal · SOL ↔ $FI6900</span>
+            <span className="micro muted">Jupiter Terminal · SOL ↔ {sym}</span>
             {outputMint && <Address value={outputMint} kind="token" head={5} tail={5} />}
           </div>
           <div className="panel-b">
-            {!outputMint ? <p className="prose">The index mint is not configured, so the swap widget is unavailable.</p> : mainnet ? <JupiterTerminal outputMint={outputMint} /> : <Fallback mint={outputMint} />}
+            {!outputMint ? <p className="prose">The index mint is not configured, so the swap widget is unavailable.</p> : mainnet ? <JupiterTerminal key={outputMint} outputMint={outputMint} /> : <Fallback mint={outputMint} />}
           </div>
         </section>
 
         <aside className="split-side" aria-label="Pricing">
+          <p className="micro muted">Index units (FIX6900 Index)</p>
           <dl className="kf-list">
             <div className="kfl">
               <dt className="micro muted">NAV per unit</dt>
@@ -167,7 +183,7 @@ export function BuyView() {
               </p>
             </div>
           )}
-          <p className="prose-sm">One unit is a pro-rata claim on the vault, redeemable in-kind for the underlying coins. $FI6900 is not a promise of returns.</p>
+          <p className="prose-sm">One unit is a pro-rata claim on the vault, redeemable in-kind for the underlying coins. FIX6900 Index is not a promise of returns.</p>
         </aside>
       </div>
       <Notes notes={[{ label: "NAV per unit read from the fund account", address: fund?.fundPda }]} asOf={clock} />

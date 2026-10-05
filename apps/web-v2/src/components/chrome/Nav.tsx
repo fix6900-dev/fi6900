@@ -60,8 +60,8 @@ export function Nav() {
   return (
     <header className="navbar">
       <nav className="page nav" aria-label="Primary">
-        <Link href="/" className="wordmark" aria-label="FI6900 home">
-          FI6900
+        <Link href="/" className="wordmark" aria-label="FIX6900 home">
+          FIX6900
         </Link>
         <div className="nav-tabs" ref={tabsRef} data-overflow={overflow || undefined}>
           {TABS.map((t) => (

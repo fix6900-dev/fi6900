@@ -23,7 +23,7 @@ const qty = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: n 
 
 type Position = { units: number; raw: bigint; account: string | null };
 
-/** The connected wallet's $FI6900 token accounts for the index mint (both token programs), summed. Polls every 15 s. */
+/** The connected wallet's FIX6900 Index token accounts for the index mint (both token programs), summed. Polls every 15 s. */
 function usePosition(owner: PublicKey | null) {
   const { connection } = useConnection();
   const mint = env.indexMint;
@@ -53,7 +53,7 @@ function usePosition(owner: PublicKey | null) {
 }
 
 /**
- * Your position: $FI6900 balance, its NAV value, share of supply, and the pro-rata slice of every vault
+ * Your position: FIX6900 Index balance, its NAV value, share of supply, and the pro-rata slice of every vault
  * you would receive on redemption, net of the redeem fee. Reads the wallet's token account over RPC; every
  * fund figure comes from the keeper snapshot and is footnoted like the rest of the factsheet.
  */
@@ -85,7 +85,7 @@ export function Portfolio({ n = 1, standalone = false }: { n?: number; standalon
   const net = gross - fee;
 
   const notes: Note[] = [
-    { label: "Your $FI6900 balance. Read from your token account for the index mint over RPC", address: pos.data?.account ?? undefined, kind: "account", source: "wallet token account" },
+    { label: "Your FIX6900 Index balance. Read from your token account for the index mint over RPC", address: pos.data?.account ?? undefined, kind: "account", source: "wallet token account" },
     { label: "Value = balance × NAV per unit; share = balance ÷ index supply. Read from the fund account", address: fund?.fundPda },
     { label: "Your share of each vault = vault balance × share. Redemption delivers these amounts in-kind, less the redeem fee", address: fund?.fundPda },
   ];
@@ -120,7 +120,7 @@ export function Portfolio({ n = 1, standalone = false }: { n?: number; standalon
             <span className="kf-v">{pos.isLoading ? <span className="faint">reading</span> : bal != null ? units(bal) : "—"}</span>
             {pos.data && <Fn n={1} note={notes[0]} />}
           </dd>
-          <dd className="faint">$FI6900 units</dd>
+          <dd className="faint">FIX6900 Index units</dd>
         </div>
         <div className="kf">
           <dt className="micro muted">Value at NAV</dt>
@@ -178,7 +178,7 @@ export function Portfolio({ n = 1, standalone = false }: { n?: number; standalon
             {rows.length === 0 && (
               <tr>
                 <td className="empty" colSpan={4}>
-                  {bal === 0 ? "This wallet holds no $FI6900 units yet." : "Reading your position"}
+                  {bal === 0 ? "This wallet holds no FIX6900 Index units yet." : "Reading your position"}
                 </td>
               </tr>
             )}
