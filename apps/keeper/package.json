@@ -1,0 +1,53 @@
+{
+  "name": "@fi6900/keeper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FI6900 off-chain keeper: pricing, methodology, NAV, rebalancer, AP arbitrage, flywheel, API",
+  "main": "dist/index.js",
+  "bin": {
+    "keeper": "dist/cli.js"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "keeper": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "keeper:localnet": "tsx --env-file=.env.localnet src/cli.ts",
+    "keeper:devnet": "tsx --env-file=.env.devnet src/cli.ts",
+    "ap:devnet": "tsx --env-file=.env.devnet scripts/localnet-ap.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@fi6900/sdk": "workspace:*",
+    "@hono/node-server": "^1.14.0",
+    "@meteora-ag/cp-amm-sdk": "^1.5.1",
+    "@pump-fun/pump-sdk": "^2.0.0",
+    "@pump-fun/pump-swap-sdk": "^1.20.0",
+    "@solana/spl-token": "^0.4.13",
+    "@solana/web3.js": "^1.98.2",
+    "better-sqlite3": "^13.0.3",
+    "bn.js": "^5.2.2",
+    "bs58": "^6.0.0",
+    "dotenv": "^17.2.0",
+    "hono": "^4.9.0",
+    "node-cron": "^4.2.0",
+    "pino": "^9.9.0",
+    "pino-pretty": "^13.1.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/bn.js": "^5.1.6",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

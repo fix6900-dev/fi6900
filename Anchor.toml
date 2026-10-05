@@ -1,0 +1,24 @@
+# Build note: the resolved dependency graph (blake3 1.8 -> digest 0.11) needs a Rust >= 1.85 platform-tools.
+# The default platform-tools shipped with solana 2.1/2.3 cargo-build-sbf is too old, so build with:
+#   anchor build --no-idl -- --tools-version v1.52
+#   anchor idl build -o target/idl/fi6900.json -t target/types/fi6900.ts
+# (then copy target/idl/fi6900.json -> packages/sdk/idl/ and target/types/fi6900.ts -> packages/sdk/src/types/)
+[toolchain]
+anchor_version = "0.31.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+fi6900 = "Cdzgsq1LMMkqA7t69t1K4NCNDy27ZNhPfFgMNcVvRnCV"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "pnpm --filter @fi6900/sdk build && pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/fi6900.ts tests/sdk.ts"
+
+[test]
+startup_wait = 20000

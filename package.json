@@ -1,0 +1,33 @@
+{
+  "name": "fi6900",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "dev:web": "pnpm --filter @fi6900/web dev",
+    "dev:keeper": "pnpm --filter @fi6900/keeper dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:program": "ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts",
+    "e2e:setup": "pnpm --filter @fi6900/keeper exec tsx scripts/fund-setup.ts --cluster localnet",
+    "e2e:setup:devnet": "pnpm --filter @fi6900/keeper exec tsx scripts/fund-setup.ts --cluster devnet",
+    "devnet:keeper": "pnpm --filter @fi6900/keeper run keeper:devnet",
+    "devnet:ap": "pnpm --filter @fi6900/keeper run ap:devnet",
+    "e2e:keeper": "pnpm --filter @fi6900/keeper run keeper:localnet run",
+    "e2e:ap": "pnpm --filter @fi6900/keeper exec tsx scripts/localnet-ap.ts",
+    "e2e:rebalance": "pnpm --filter @fi6900/keeper run keeper:localnet rebalance",
+    "e2e:governance": "pnpm --filter @fi6900/keeper run keeper:localnet governance"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@solana/spl-token": "^0.4.13",
+    "@solana/web3.js": "^1.98.2",
+    "@types/bn.js": "^5.1.6",
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.15.0",
+    "chai": "^4.5.0",
+    "mocha": "^10.8.2",
+    "ts-mocha": "^11.1.0",
+    "typescript": "^5.8.3"
+  }
+}

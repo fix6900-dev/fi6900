@@ -1,0 +1,261 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0a0b0d;
+  --color-surface: #111317;
+  --color-surface-2: #16191e;
+  --color-surface-3: #1c2026;
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-strong: rgba(255, 255, 255, 0.14);
+  --color-text: #e8eaed;
+  --color-muted: #8b919a;
+  --color-dim: #7f8791;
+  --color-accent: #b6ff3b;
+  --color-accent-dim: rgba(182, 255, 59, 0.12);
+  --color-neg: #ff5c5c;
+  --color-neg-dim: rgba(255, 92, 92, 0.12);
+  --color-amber: #ffb547;
+  --color-amber-dim: rgba(255, 181, 71, 0.12);
+
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html {
+    background: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scrollbar-color: #2a2f37 transparent;
+  }
+  body {
+    @apply bg-bg text-text font-display text-sm;
+    font-feature-settings: "ss01", "cv11";
+    overflow-x: hidden;
+  }
+  ::selection {
+    background: rgba(182, 255, 59, 0.25);
+    color: #fff;
+  }
+  * {
+    border-color: var(--color-line);
+  }
+  a {
+    @apply transition-colors duration-150;
+  }
+  button {
+    cursor: pointer;
+  }
+  input,
+  textarea,
+  select {
+    outline: none;
+  }
+  /* Visible focus for keyboard users, in the accent, everywhere. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  /* Fields draw their own ring on the wrapper instead. */
+  .field:focus-within {
+    box-shadow: inset 0 0 0 1px var(--color-accent);
+  }
+  .field input:focus-visible,
+  .field select:focus-visible {
+    outline: none;
+  }
+  /* tabular numerals everywhere numbers appear */
+  .num,
+  td,
+  th,
+  .font-mono {
+    font-variant-numeric: tabular-nums slashed-zero;
+    font-feature-settings: "tnum" 1, "zero" 1;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a2f37;
+    border-radius: 999px;
+    border: 3px solid var(--color-bg);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* --- layout rhythm ------------------------------------------------- */
+  .wrap {
+    @apply mx-auto w-full max-w-[1440px] px-4 sm:px-6;
+  }
+  /* Home sections: 56px mobile / 96px desktop. */
+  .section {
+    @apply py-14 sm:py-24;
+  }
+  /* App pages: 56px mobile / 80px desktop. */
+  .page {
+    @apply py-14 sm:py-20;
+  }
+  .page-head {
+    @apply mb-10 max-w-2xl sm:mb-12;
+  }
+
+  /* --- borders ---------------------------------------------------------- */
+  .hairline {
+    box-shadow: inset 0 0 0 1px var(--color-line);
+  }
+  .hairline-t {
+    box-shadow: inset 0 1px 0 0 var(--color-line);
+  }
+
+  /* --- type ------------------------------------------------------------- */
+  .eyebrow {
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted;
+  }
+  .mono {
+    @apply font-mono;
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* --- form field wrapper ---------------------------------------------- */
+  .field {
+    @apply flex items-center gap-2 rounded-md bg-surface-2 px-3;
+    box-shadow: inset 0 0 0 1px var(--color-line);
+  }
+
+  /* --- motion ------------------------------------------------------------ */
+  .flash-cell {
+    animation: flash 900ms var(--ease-out-expo) 1;
+  }
+  .flash-cell-neg {
+    animation: flash-neg 900ms var(--ease-out-expo) 1;
+  }
+  .live-dot::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 999px;
+    border: 1px solid var(--color-accent);
+    animation: ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+}
+
+@keyframes flash {
+  0% {
+    background-color: rgba(182, 255, 59, 0.18);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@keyframes flash-neg {
+  0% {
+    background-color: rgba(255, 92, 92, 0.18);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@keyframes ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* wallet-adapter overrides → terminal look */
+.wallet-adapter-button-trigger {
+  background: var(--color-accent) !important;
+  color: #0a0b0d !important;
+  font-family: var(--font-display) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 6px !important;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.wallet-adapter-button-trigger:hover {
+  background: #c8ff6a !important;
+}
+.wallet-adapter-button {
+  font-family: var(--font-display) !important;
+}
+.wallet-adapter-dropdown-list {
+  background: var(--color-surface-2) !important;
+  border: 1px solid var(--color-line-strong) !important;
+  border-radius: 8px !important;
+  font-family: var(--font-display) !important;
+}
+.wallet-adapter-dropdown-list-item {
+  font-size: 13px !important;
+  border-radius: 6px !important;
+}
+.wallet-adapter-dropdown-list-item:hover {
+  background: var(--color-surface-3) !important;
+}
+.wallet-adapter-modal-wrapper {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-line-strong) !important;
+  border-radius: 12px !important;
+  font-family: var(--font-display) !important;
+}
+.wallet-adapter-modal-title {
+  color: var(--color-text) !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background: var(--color-surface-2) !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background: var(--color-surface-3) !important;
+}
+.wallet-adapter-modal-button-close {
+  background: var(--color-surface-3) !important;
+}
+.wallet-adapter-modal-overlay {
+  background: rgba(10, 11, 13, 0.8) !important;
+}
+
+/* Jupiter terminal container */
+#jupiter-terminal {
+  min-height: 560px;
+}

@@ -1,0 +1,134 @@
+[
+ {
+  "id": "pudgy-penguins",
+  "symbol": "pengu",
+  "name": "Pudgy Penguins",
+  "platforms": {
+   "solana": "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv",
+   "abstract": "0x9ebe3a824ca958e4b3da772d2065518f009cba62",
+   "ethereum": "0x6418c0dd099a9fda397c766304cdd918233e8847",
+   "hyperevm": "0xfa44c2634ff17cbe26dc3007d36bd61c79068c14",
+   "robinhood": "0x74be72affafbc8de30f0c11247814036314d625f",
+   "binance-smart-chain": "0x6418c0dd099a9fda397c766304cdd918233e8847",
+   "hyperliquid": "0x1765b5a9ec8fc3cdbc209c63cac68e86"
+  }
+ },
+ {
+  "id": "official-trump",
+  "symbol": "trump",
+  "name": "Official Trump",
+  "platforms": {
+   "solana": "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN"
+  }
+ },
+ {
+  "id": "dogwifcoin",
+  "symbol": "wif",
+  "name": "dogwifhat",
+  "platforms": {
+   "solana": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+   "unichain": "0x97fadb3d000b953360fd011e173f12cddb5d70fa"
+  }
+ },
+ {
+  "id": "useless-3",
+  "symbol": "useless",
+  "name": "Useless Coin",
+  "platforms": {
+   "solana": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+   "binance-smart-chain": "0xba38b3c706f7a515ff7c8db04daa0a134ec46d2b"
+  }
+ },
+ {
+  "id": "fartcoin",
+  "symbol": "fartcoin",
+  "name": "Fartcoin",
+  "platforms": {
+   "solana": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"
+  }
+ },
+ {
+  "id": "melania-meme",
+  "symbol": "melania",
+  "name": "Melania Meme",
+  "platforms": {
+   "solana": "FUAfBo2jgks6gB4Z4LfZkqSZgzNucisEHqnNebaRxM1P"
+  }
+ },
+ {
+  "id": "dog-go-to-the-moon-rune",
+  "symbol": "dog",
+  "name": "Dog (Bitcoin)",
+  "platforms": {
+   "ordinals": "840000:3",
+   "solana": "dog1viwbb2vWDpER5FrJ4YFG6gq6XuyFohUe9TXN65u",
+   "starknet": "0x040e81cfeb176bfdbc5047bbc55eb471cfab20a6b221f38d8fda134e1bfffca4"
+  }
+ },
+ {
+  "id": "baby-doge-coin",
+  "symbol": "babydoge",
+  "name": "Baby Doge Coin",
+  "platforms": {
+   "binance-smart-chain": "0xc748673057861a797275cd8a068abb95a902e8de",
+   "ethereum": "0xac57de9c1a09fec648e93eb98875b212db0d460b",
+   "base": "0x58ecef26335af7b04a998105a6603b0dc475af33",
+   "the-open-network": "EQCWDj49HFInSwSk49eAo476E1YBywLoFuSZ6OO3x7jmP2jn",
+   "solana": "7dUKUopcNWW6CcU4eRxCHh1uiMh32zDrmGf6ufqhxann"
+  }
+ },
+ {
+  "id": "book-of-meme",
+  "symbol": "bome",
+  "name": "BOOK OF MEME",
+  "platforms": {
+   "solana": "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82"
+  }
+ },
+ {
+  "id": "comedian",
+  "symbol": "ban",
+  "name": "Comedian",
+  "platforms": {
+   "solana": "9PR7nCP9DpcUotnDPVLUBUZKu5WAYkwrCUx9wDnSpump"
+  }
+ },
+ {
+  "id": "the-black-bull",
+  "symbol": "ansem",
+  "name": "The Black Bull",
+  "platforms": {
+   "solana": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump"
+  }
+ },
+ {
+  "id": "catcoin-eth",
+  "symbol": "cat",
+  "name": "Catcoin (ETH)",
+  "platforms": {
+   "ethereum": "0x59f4f336bf3d0c49dbfba4a74ebd2a6ace40539a"
+  }
+ },
+ {
+  "id": "badmint-coin",
+  "symbol": "bad",
+  "name": "Bad Mint",
+  "platforms": {
+   "solana": "0xdeadbeefnotbase58"
+  }
+ },
+ {
+  "id": "bonk-duplicate",
+  "symbol": "bonk2",
+  "name": "Bonk duplicate listing",
+  "platforms": {
+   "solana": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+  }
+ },
+ {
+  "id": "ethereum",
+  "symbol": "eth",
+  "name": "Ethereum",
+  "platforms": {}
+ }
+]
