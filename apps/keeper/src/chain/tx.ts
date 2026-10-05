@@ -38,6 +38,13 @@ export interface TxSender {
   simulate(ixs: TransactionInstruction[], opts?: SendOptions): Promise<{ ok: boolean; logs: string[]; err?: string }>;
 }
 
+export class TxExpiredError extends Error {
+  constructor(readonly sig: string) {
+    super(`Signature ${sig} expired: block height exceeded`);
+    this.name = 'TxExpiredError';
+  }
+}
+
 export class RpcTxSender implements TxSender {
   constructor(
     private readonly connection: Connection,
@@ -50,8 +57,8 @@ export class RpcTxSender implements TxSender {
     return this.keypair.publicKey;
   }
 
-  private async build(ixs: TransactionInstruction[], opts: SendOptions): Promise<VersionedTransaction> {
-    const { blockhash } = await this.connection.getLatestBlockhash();
+  private async build(ixs: TransactionInstruction[], opts: SendOptions): Promise<{ tx: VersionedTransaction; lastValidBlockHeight: number }> {
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
     const all = [
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: this.priorityFeeMicroLamports }),
       ComputeBudgetProgram.setComputeUnitLimit({ units: opts.computeUnits ?? 600_000 }),
@@ -60,19 +67,63 @@ export class RpcTxSender implements TxSender {
     const msg = new TransactionMessage({ payerKey: this.payer, recentBlockhash: blockhash, instructions: all }).compileToV0Message(
       opts.lookupTables ?? [],
     );
-    return new VersionedTransaction(msg);
+    return { tx: new VersionedTransaction(msg), lastValidBlockHeight };
+  }
+
+  /**
+   * Sends a signed tx and rebroadcasts it every ~2 s until it is confirmed or the chain has moved past
+   * `lastValidBlockHeight` (then the signature can never land and the caller may rebuild with a fresh blockhash).
+   */
+  private async sendAndConfirm(tx: VersionedTransaction, lastValidBlockHeight: number, opts: SendOptions): Promise<string> {
+    const raw = tx.serialize();
+    const sig = await withRetry(
+      () => this.connection.sendRawTransaction(raw, { skipPreflight: opts.skipPreflight ?? false, maxRetries: 0 }),
+      { retries: 2 },
+    );
+    const started = Date.now();
+    for (;;) {
+      const st = (await this.connection.getSignatureStatuses([sig])).value[0];
+      if (st && (st.confirmationStatus === 'confirmed' || st.confirmationStatus === 'finalized')) {
+        if (st.err) throw new Error(`tx ${sig} failed: ${JSON.stringify(st.err)}`);
+        return sig;
+      }
+      const height = await this.connection.getBlockHeight('confirmed');
+      if (height > lastValidBlockHeight) throw new TxExpiredError(sig);
+      if (Date.now() - started > 120_000) throw new TxExpiredError(sig);
+      // rebroadcast: validators drop low-priority txs under load, so keep re-sending the same signature
+      await this.connection.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 0 }).catch(() => undefined);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
   }
 
   async simulate(ixs: TransactionInstruction[], opts: SendOptions = {}): Promise<{ ok: boolean; logs: string[]; err?: string }> {
-    const tx = await this.build(ixs, opts);
+    const { tx } = await this.build(ixs, opts);
     const res = await this.connection.simulateTransaction(tx, { sigVerify: false, replaceRecentBlockhash: true });
     return { ok: !res.value.err, logs: res.value.logs ?? [], err: res.value.err ? JSON.stringify(res.value.err) : undefined };
   }
 
   async sendIxs(ixs: TransactionInstruction[], opts: SendOptions = {}): Promise<string> {
     if (ixs.length === 0) throw new Error('no instructions');
-    const tx = await this.build(ixs, opts);
-    return this.sendVersioned(tx, opts);
+    if (this.dryRun) {
+      const { tx } = await this.build(ixs, opts);
+      return this.sendVersioned(tx, opts);
+    }
+    // Rebuild with a fresh blockhash each time the previous one provably expired.
+    for (let attempt = 1; ; attempt++) {
+      const { tx, lastValidBlockHeight } = await this.build(ixs, opts);
+      tx.sign([this.keypair, ...(opts.signers ?? [])]);
+      try {
+        const sig = await this.sendAndConfirm(tx, lastValidBlockHeight, opts);
+        log.info({ label: opts.label, sig, attempt }, 'tx confirmed');
+        return sig;
+      } catch (e) {
+        if (e instanceof TxExpiredError && attempt < 4) {
+          log.warn({ label: opts.label, sig: e.sig, attempt }, 'tx expired without landing; rebuilding with a fresh blockhash');
+          continue;
+        }
+        throw e;
+      }
+    }
   }
 
   async sendVersioned(tx: VersionedTransaction, opts: SendOptions = {}): Promise<string> {
@@ -84,13 +135,9 @@ export class RpcTxSender implements TxSender {
       return DRY_RUN_SIG;
     }
     tx.sign([this.keypair, ...(opts.signers ?? [])]);
-    const sig = await withRetry(
-      () => this.connection.sendTransaction(tx, { skipPreflight: opts.skipPreflight ?? false, maxRetries: 3 }),
-      { retries: 2 },
-    );
-    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
-    const conf = await this.connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
-    if (conf.value.err) throw new Error(`tx ${sig} failed: ${JSON.stringify(conf.value.err)}`);
+    // Pre-built tx: we cannot rebuild it, so confirm against the blockhash it carries.
+    const lastValid = (await this.connection.getLatestBlockhash('confirmed')).lastValidBlockHeight;
+    const sig = await this.sendAndConfirm(tx, lastValid, opts);
     log.info({ label: opts.label, sig }, 'tx confirmed');
     return sig;
   }

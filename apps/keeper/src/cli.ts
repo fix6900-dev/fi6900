@@ -96,13 +96,27 @@ async function withCtx<T>(flags: Record<string, string | boolean>, fn: (ctx: Liv
  */
 async function initFund(flags: Record<string, string | boolean>): Promise<void> {
   const env = loadEnv(flags.dry ? { DRY_RUN: 'true' } : {});
+  // --resume <index mint>: the fund already exists on-chain (mint, initialize_fund, add_asset, ref prices, lookup table
+  // done); only the basket purchase / vault deposits / bootstrap_mint remain. Legs already bought or deposited are skipped.
+  const resumeMint = typeof flags.resume === 'string' ? flags.resume : null;
   const mintKp = Keypair.generate();
-  logger.info({ mint: mintKp.publicKey.toBase58() }, 'generated index mint keypair (SAVE THIS)');
-  process.stdout.write(`INDEX_MINT=${mintKp.publicKey.toBase58()}\nINDEX_MINT_SECRET=${JSON.stringify([...mintKp.secretKey])}\n`);
+  const indexMint = resumeMint ?? mintKp.publicKey.toBase58();
+  if (resumeMint) logger.info({ mint: resumeMint }, 'RESUMING an existing fund; skipping mint/initialize/add_asset/ref-price/lookup-table steps');
+  else {
+    logger.info({ mint: mintKp.publicKey.toBase58() }, 'generated index mint keypair (SAVE THIS)');
+    process.stdout.write(`INDEX_MINT=${mintKp.publicKey.toBase58()}\nINDEX_MINT_SECRET=${JSON.stringify([...mintKp.secretKey])}\n`);
+  }
 
-  const ctx = await createLiveContext({ ...(flags.dry ? { DRY_RUN: 'true' } : {}), INDEX_MINT: mintKp.publicKey.toBase58() });
+  const ctx = await createLiveContext({ ...(flags.dry ? { DRY_RUN: 'true' } : {}), INDEX_MINT: indexMint });
   try {
     const { connection, keeper, chain, tx } = ctx;
+    let selected: { mint: string; symbol: string; weightBps: number }[];
+    if (resumeMint) {
+      const existing = await chain.readAssets();
+      if (existing.length === 0) throw new Error(`fund for ${resumeMint} has no assets; nothing to resume`);
+      selected = existing.map((a) => ({ mint: a.mint, symbol: a.mint.slice(0, 4), weightBps: a.targetWeightBps }));
+      logger.info({ fund: chain.fundPda.toBase58(), assets: existing.length }, 'fund state read for resume');
+    } else {
     // 1) create mint
     const lamports = await getMinimumBalanceForRentExemptMint(connection);
     const createMintIxs = [
@@ -117,7 +131,6 @@ async function initFund(flags: Record<string, string | boolean>): Promise<void> 
     logger.info({ s1, s2, fund: chain.fundPda.toBase58() }, 'fund initialised');
 
     // 3) constituents: --basket <json> (committee-approved list, e.g. config/launch-basket.json) or a live methodology run
-    let selected: { mint: string; symbol: string; weightBps: number }[];
     if (typeof flags.basket === 'string') {
       const basket = JSON.parse(readFileSync(flags.basket, 'utf8')) as { assets: { mint: string; symbol: string; targetWeightBps: number; allowTransferFee?: boolean }[] };
       selected = basket.assets.map((a) => ({ mint: a.mint, symbol: a.symbol, weightBps: a.targetWeightBps }));
@@ -164,6 +177,7 @@ async function initFund(flags: Record<string, string | boolean>): Promise<void> 
     for (const group of lut.instructionGroups) lutSigs.push(await tx.sendIxs(group, { label: `lookup table (${lutSigs.length + 1}/${lut.instructionGroups.length})` }));
     logger.info({ lookupTables: lut.lookupTables.map((t) => t.toBase58()), addresses: lut.addresses, sigs: lutSigs }, 'lookup table(s) created');
     process.stdout.write(`LOOKUP_TABLE=${lut.lookupTables.map((t) => t.toBase58()).join(',')}\n`);
+    } // end !resumeMint
 
     // 5) bootstrap
     const solAmount = typeof flags.sol === 'string' ? Number(flags.sol) : 0;
@@ -176,24 +190,50 @@ async function initFund(flags: Record<string, string | boolean>): Promise<void> 
       for (const a of assets) {
         const w = selected.find((x) => x.mint === a.mint)?.weightBps ?? 0;
         if (w === 0) continue;
-        const lamportsIn = uiToBigint((solAmount * w) / 10_000, 9);
-        const q = await ctx.sources.quotes.quote({ inputMint: WSOL_MINT, outputMint: a.mint, amount: lamportsIn, slippageBps: env.AP_SLIPPAGE_BPS });
-        const swapSig = await tx.sendVersioned(await ctx.sources.quotes.swapTx(q, keeper.publicKey.toBase58()), { label: `bootstrap buy ${a.mint}` });
-        const from = getAssociatedTokenAddressSync(new PublicKey(a.mint), keeper.publicKey, false, new PublicKey(a.tokenProgram));
+        const mintPk = new PublicKey(a.mint);
+        const tokenProgram = new PublicKey(a.tokenProgram);
+        const from = getAssociatedTokenAddressSync(mintPk, keeper.publicKey, false, tokenProgram);
         const vault = new PublicKey(a.vault);
+        const balanceOf = async (acct: PublicKey): Promise<bigint> => {
+          const r = await connection.getTokenAccountBalance(acct).catch(() => null);
+          return r ? BigInt(r.value.amount) : 0n;
+        };
+        // Resume-safe: a vault that already holds tokens was deposited in an earlier run; a keeper ATA that already
+        // holds tokens was bought in an earlier run (the deposit failed) and must not be bought again.
+        const vaultBefore = await balanceOf(vault);
+        if (vaultBefore > 0n) {
+          deposited += (Number(vaultBefore) / 10 ** a.decimals) * (prices.get(a.mint) ?? 0);
+          logger.info({ mint: a.mint, vaultBalance: vaultBefore.toString() }, 'bootstrap leg already deposited; skipping');
+          continue;
+        }
+        let swapSig: string | null = null;
+        let held = await balanceOf(from);
+        if (held === 0n) {
+          const lamportsIn = uiToBigint((solAmount * w) / 10_000, 9);
+          const q = await ctx.sources.quotes.quote({ inputMint: WSOL_MINT, outputMint: a.mint, amount: lamportsIn, slippageBps: env.AP_SLIPPAGE_BPS });
+          swapSig = await tx.sendVersioned(await ctx.sources.quotes.swapTx(q, keeper.publicKey.toBase58()), { label: `bootstrap buy ${a.mint}` });
+          held = tx.dryRun ? q.outAmount : await balanceOf(from);
+          if (held === 0n) throw new Error(`swap for ${a.mint} confirmed but no tokens arrived in ${from.toBase58()}`);
+        } else {
+          logger.info({ mint: a.mint, held: held.toString() }, 'keeper already holds this leg; depositing without re-buying');
+        }
+        // Deposit exactly what we hold (Jupiter delivers <= the quoted amount after slippage).
         const xferSig = await tx.sendIxs(
           [
-            createAssociatedTokenAccountIdempotentInstruction(keeper.publicKey, vault, chain.fundPda, new PublicKey(a.mint), new PublicKey(a.tokenProgram)),
-            createTransferCheckedInstruction(from, new PublicKey(a.mint), vault, keeper.publicKey, q.outAmount, a.decimals, [], new PublicKey(a.tokenProgram)),
+            createAssociatedTokenAccountIdempotentInstruction(keeper.publicKey, vault, chain.fundPda, mintPk, tokenProgram),
+            createTransferCheckedInstruction(from, mintPk, vault, keeper.publicKey, held, a.decimals, [], tokenProgram),
           ],
           { label: `bootstrap deposit ${a.mint}` },
         );
-        deposited += (Number(q.outAmount) / 10 ** a.decimals) * (prices.get(a.mint) ?? 0);
-        logger.info({ mint: a.mint, swapSig, xferSig }, 'bootstrap leg done');
+        deposited += (Number(held) / 10 ** a.decimals) * (prices.get(a.mint) ?? 0);
+        logger.info({ mint: a.mint, swapSig, xferSig, amount: held.toString() }, 'bootstrap leg done');
       }
       // NAV/unit = $1.00 at inception
       const units = uiToBigint(deposited > 0 ? deposited : totalUsd, 6);
-      const sig = await tx.sendIxs(await chain.bootstrapMintIx(units, keeper.publicKey), { label: 'bootstrap_mint' });
+      // bootstrap_mint passes [Asset, vault] for every constituent; above ~12 assets it only fits with the lookup table.
+      const lutAddrs = String(env.LOOKUP_TABLE ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+      const lookupTables = (await Promise.all(lutAddrs.map(async (a) => (await connection.getAddressLookupTable(new PublicKey(a))).value))).filter((t): t is NonNullable<typeof t> => t !== null);
+      const sig = await tx.sendIxs(await chain.bootstrapMintIx(units, keeper.publicKey), { label: 'bootstrap_mint', lookupTables, computeUnits: 400_000 });
       logger.info({ units: units.toString(), sig, depositedUsd: deposited.toFixed(2) }, sig === DRY_RUN_SIG ? 'bootstrap simulated' : 'bootstrap minted');
       // The bootstrap units sit in the keeper (= fee_recipient) ATA; fee processing must not treat them as fees.
       process.stdout.write(`FEE_RESERVED_UNITS=${units.toString()}
@@ -467,7 +507,7 @@ async function cli(argv: string[]): Promise<void> {
       process.stdout.write(
         [
           'keeper <command> [flags]',
-          '  init-fund [--sol <amount>] [--basket <json>] [--dry]',
+          '  init-fund [--sol <amount>] [--basket <json>] [--resume <index mint>] [--dry]',
           '  run',
           '  methodology [--dry]',
           '  rebalance [--dry] [--force]',
