@@ -1,0 +1,31 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+@import "./components.css";
+@import "./pages.css";
+@import "./pages2.css";
+
+/* Tailwind v4 is wired to tokens.css. The theme names below point at the factsheet tokens, so every
+   utility follows the Paper / Ink switch. Names avoid clashing with the token names themselves. */
+@theme {
+  --color-paper: var(--color-bg);
+  --color-panel: var(--color-surface);
+  --color-panel-2: var(--color-surface-sunk);
+  --color-panel-3: var(--color-surface-sunk);
+  --color-ink: var(--color-text);
+  --color-muted: var(--color-text-muted);
+  --color-dim: var(--color-text-faint);
+  --color-line: var(--rule);
+  --color-line-strong: var(--rule-strong);
+  /* legacy admin classes: ok = up colour, bad = down colour, warn = ink on pastel orange */
+  --color-accent: var(--color-text-up);
+  --color-accent-dim: var(--fill-up);
+  --color-neg: var(--color-text-down);
+  --color-neg-dim: var(--fill-down);
+  --color-amber: var(--color-text);
+  --color-amber-dim: var(--pastel-orange);
+  --radius-sm: var(--radius-1);
+  --radius-md: var(--radius-1);
+  --radius-lg: var(--radius-0);
+  --radius-xl: var(--radius-0);
+  --radius-2xl: var(--radius-0);
+}

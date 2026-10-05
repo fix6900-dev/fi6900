@@ -89,7 +89,7 @@ anchor idl init -f target/idl/fi6900.json Cdzgsq1LMMkqA7t69t1K4NCNDy27ZNhPfFgMNc
 
 # 2. fund (12 mints + metadata, fund, assets, ref prices, LUT, vault seed, bootstrap; funds AP + burner from the keeper)
 pnpm e2e:setup:devnet            # == tsx apps/keeper/scripts/fund-setup.ts --cluster devnet [--rpc <url>] [--assets 12] [--no-metadata]
-#   writes apps/keeper/.env.devnet, apps/web/.env.devnet (+ .env.local), keypairs/devnet-prices.json, keypairs/devnet.json
+#   writes apps/keeper/.env.devnet, apps/web/.env.devnet (+ .env.local; copy to apps/web-v2/.env.local), keypairs/devnet-prices.json, keypairs/devnet.json
 
 # 3. prove it with the SDK (AP wallet) — every signature is printed
 pnpm devnet:ap status
@@ -132,6 +132,12 @@ Set them with the Railway dashboard, `railway variables --set K=V`, or the Railw
 
 ## Site on Vercel
 
+Project `fi6900` (team `xperts-projects-6c5c6371`), linked at the repo root via `.vercel/project.json`. The site is
+`apps/web-v2` (`@fi6900/web-v2`, Next.js 15): **Root Directory** `apps/web-v2`, **Build Command**
+`pnpm --filter @fi6900/sdk build && pnpm --filter @fi6900/web-v2 build` (the SDK is a workspace dependency, so it is
+built first), **Install Command** `pnpm install` from the monorepo root. `apps/web` is the legacy site and is not deployed;
+remove it after launch. Local dev: `pnpm --filter @fi6900/web-v2 dev` (`.claude/launch.json` entry `web-v2`, port 3100).
+
 Env (Production + Preview): `NEXT_PUBLIC_API_URL=https://keeper-production-94c7.up.railway.app`,
 `NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com`, `NEXT_PUBLIC_CLUSTER=devnet`, `NEXT_PUBLIC_INDEX_MINT`,
 `NEXT_PUBLIC_PROGRAM_ID`, `NEXT_PUBLIC_LOOKUP_TABLE`. `NEXT_PUBLIC_*` is baked at build time → redeploy after a change:
@@ -142,7 +148,7 @@ npx vercel deploy --prod --yes --scope xperts-projects-6c5c6371
 ```
 
 With `NEXT_PUBLIC_CLUSTER=devnet` every Solscan link carries `?cluster=devnet` and the wallet modal offers the
-**Devnet test wallet** (`apps/web/src/lib/burnerWallet.ts`): an in-page keypair loaded from `?burner=<base58 secret>`
+**Devnet test wallet** (`apps/web-v2/src/lib/burnerWallet.ts`): an in-page keypair loaded from `?burner=<base58 secret>`
 (stripped from the URL and kept in `localStorage`), so `/create` and `/auctions` can be driven without an extension.
 The setup script funds `keypairs/devnet-burner.json` with 20 % of each vault; open
 `https://fi6900.vercel.app/create?burner=<base58 of that secret>` once to load it.

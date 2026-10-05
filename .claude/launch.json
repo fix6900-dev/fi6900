@@ -7,6 +7,13 @@
       "runtimeArgs": ["--filter", "@fi6900/web", "dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "web-v2",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@fi6900/web-v2", "dev"],
+      "port": 3100,
+      "autoPort": true
     }
   ]
 }

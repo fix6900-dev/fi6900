@@ -13,7 +13,8 @@ An on-chain, equal-weight memecoin index fund on Solana that works the way SPY w
 programs/fi6900   Anchor program (Rust)
 packages/sdk      TypeScript client (@fi6900/sdk)
 apps/keeper       pricing, methodology, NAV, rebalancer, AP arbitrage, flywheel, HTTP API
-apps/web          Next.js site
+apps/web-v2       Next.js site (https://fi6900.vercel.app): paper/ink factsheet, @fi6900/web-v2
+apps/web          legacy site, kept for reference until launch; to be removed
 tests             program integration tests
 docs              methodology, operations, runbook, tokenomics
 ```
@@ -29,11 +30,13 @@ docs              methodology, operations, runbook, tokenomics
 pnpm install
 ```
 
-Frontend with demo data, no backend needed:
+Frontend with demo data, no backend needed (falls back to sample fixtures when the keeper API is unreachable):
 
 ```bash
-pnpm --filter @fi6900/web dev
+pnpm --filter @fi6900/web-v2 dev
 ```
+
+Pointed at the live devnet keeper via `apps/web-v2/.env.local` (see [docs/devnet.md](docs/devnet.md)).
 
 Keeper API in mock mode:
 
@@ -53,7 +56,7 @@ See [docs/operations.md](docs/operations.md) for the local-validator test flow a
 
 - The vault is program-owned. No key can mint units without depositing the basket, and nothing leaves the vault except through redemption or an auction fill at a bounded price.
 - Admin changes (fees, weights, constituents, roles) sit behind an on-chain timelock. Pause is instant and only ever stops activity.
-- The program is **upgradeable** and the upgrade authority is disclosed on the site's `/verify` page. The plan is to move it to a Realms DAO governed by `$FI` holders, see [docs/mainnet-go-live.md](docs/mainnet-go-live.md). Until then, holders are trusting that key.
+- The program is **upgradeable** and the upgrade authority is disclosed on the site's `/verify` page and home verify strip. The plan is to move it to a Realms DAO governed by `$FI` holders, see [docs/mainnet-go-live.md](docs/mainnet-go-live.md). Until then, holders are trusting that key.
 - Builds are reproducible with the pinned toolchain; see [SECURITY.md](SECURITY.md) for how to verify the deployed bytes against this repository.
 
 ## License

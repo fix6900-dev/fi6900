@@ -1,0 +1,162 @@
+/* FI6900 — Factsheet. Design tokens. Components use these values only.
+   Light "paper" is the default; [data-theme="ink"] is the dark inversion.
+   Fonts (self-hosted via Fontsource, OFL):
+     @fontsource-variable/azeret-mono  (numerals, labels, tables, UI)
+     @fontsource-variable/source-serif-4 (prose only: rulebook, explanations) */
+
+:root {
+  /* ---------- colour: paper theme ---------- */
+  --color-bg: #f7f6f2;            /* page paper, slightly warm */
+  --color-surface: #ffffff;       /* panels, table body, key-figures box */
+  --color-surface-sunk: #eeede8;  /* row hover, input fill, code blocks */
+
+  --color-text: #11110f;          /* ink: all body text and numerals */
+  --color-text-muted: #55554f;    /* labels, secondary values */
+  --color-text-faint: #6b6b64;    /* as-of footnotes, placeholders (>=4.5 on bg and surface) */
+  --ink-on-pastel: #11110f;/* text placed on any pastel / coin fill */
+
+  --rule: #e2e1db;                /* hairline rules between rows */
+  --rule-strong: #c6c5be;         /* column and panel borders */
+  --rule-ink: #11110f;            /* factsheet heavy rules: above section titles, under masthead */
+
+  /* pastel hints (fills only, never as text colour on paper) */
+  --pastel-blue: #c9ddf6;         /* NAV, on-chain truth, verified */
+  --pastel-blue-strong: #9fc2ee;  /* active fill, live-dot ring */
+  --pastel-orange: #ffd8b8;       /* market price, attention, pending */
+  --pastel-orange-strong: #ffbb85;
+
+  /* line colours derived from the pastels, for chart strokes and needle */
+  --line-nav: #3d6fb3;            /* NAV / index level series */
+  --line-market: #d07a2c;         /* market price series (dashed) */
+
+  /* deltas: ink-weight for text, fills for flashes */
+  --color-text-up: #0d7344;
+  --color-text-down: #ab3224;
+  --fill-up: #d6eedf;
+  --fill-down: #f6dcd7;
+
+  --focus-ring: #3d6fb3;
+
+  /* coin colours are computed per mint at runtime:
+     oklch(var(--coin-l) var(--coin-c) <hue from mint hash>) */
+  --coin-l: 0.80;
+  --coin-c: 0.10;
+
+  /* ---------- typography ---------- */
+  --font-mono: "Azeret Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-prose: "Source Serif 4 Variable", Georgia, "Times New Roman", serif;
+
+  --fs-micro: 0.6875rem;                          /* 11px tracked uppercase labels */
+  --fs-small: 0.8125rem;                          /* 13px table cells, footnotes */
+  --fs-body: 0.9375rem;                           /* 15px UI text (mono) */
+  --fs-prose: clamp(1.0625rem, 0.98rem + 0.3vw, 1.1875rem); /* 17-19px serif prose */
+  --fs-h3: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);
+  --fs-h2: clamp(1.375rem, 1.1rem + 1vw, 2rem);
+  --fs-h1: clamp(2rem, 1.4rem + 2.6vw, 3.5rem);
+  --fs-figure: clamp(1.25rem, 1.05rem + 0.8vw, 1.75rem);   /* key-figure values */
+  --fs-level: clamp(5.5rem, 2.2rem + 15vw, 16.5rem);       /* THE LEVEL: 88px -> 264px */
+
+  --fw-level: 220;
+  --fw-figure: 420;
+  --fw-body: 400;
+  --fw-label: 560;
+  --fw-heading: 620;
+
+  --lh-tight: 0.92;
+  --lh-snug: 1.2;
+  --lh-body: 1.5;
+  --lh-prose: 1.6;
+
+  --tracking-level: -0.045em;
+  --tracking-heading: -0.02em;
+  --tracking-label: 0.09em;
+
+  /* ---------- spacing (4px base) ---------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --space-9: 6rem;
+  --space-10: 8rem;
+  --section-gap: clamp(4rem, 2.5rem + 6vw, 8rem);
+  --gutter: clamp(1rem, 0.6rem + 1.6vw, 2rem);
+  --row-pad-y: 0.75rem;
+  --row-pad-x: 0.5rem;
+
+  /* ---------- layout ---------- */
+  --max-page: 82.5rem;          /* 1320px */
+  --max-prose: 40rem;           /* 640px rulebook measure */
+  --masthead-h: 2.25rem;
+  --nav-h: 3rem;
+  --mobile-bar-h: 4rem;
+
+  /* ---------- shape ---------- */
+  --radius-0: 0;
+  --radius-1: 2px;              /* chips, inputs, buttons: barely rounded */
+  --hairline: 1px;
+  --rule-heavy: 2px;
+  --shadow-none: none;
+  --shadow-pop: 0 1px 0 var(--rule-strong), 0 8px 24px -12px rgb(17 17 15 / 0.18); /* popovers only */
+
+  /* ---------- motion ---------- */
+  --dur-instant: 90ms;          /* hover colour */
+  --dur-quick: 150ms;           /* focus, tab underline */
+  --dur-flash: 900ms;           /* changed-cell tint fade-out */
+  --dur-count: 1100ms;          /* hero count-up */
+  --dur-pulse: 2000ms;          /* live dot */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);      /* "settle": entrances, underline */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);  /* colour/background */
+  --ease-linear: linear;
+  /* springs (Framer Motion) — read by JS via getComputedStyle */
+  --spring-stiffness: 420;
+  --spring-damping: 38;         /* near critical: max ~2% overshoot */
+  --spring-mass: 1;
+
+  --z-nav: 20;
+  --z-mobile-bar: 30;
+  --z-popover: 40;
+  --z-banner: 50;
+}
+
+/* ---------- ink theme: paper and ink invert, meanings stay ---------- */
+:root[data-theme="ink"] {
+  --color-bg: #10100e;
+  --color-surface: #171715;
+  --color-surface-sunk: #1f1f1c;
+  --color-text: #eceae4;
+  --color-text-muted: #a9a8a0;
+  --color-text-faint: #8e8d86;
+  --ink-on-pastel: #11110f;
+  --rule: #2a2a26;
+  --rule-strong: #3a3a35;
+  --rule-ink: #eceae4;
+  --line-nav: #8fb6ea;
+  --line-market: #f2a868;
+  --color-text-up: #5fcf96;
+  --color-text-down: #f08273;
+  --fill-up: #173a28;
+  --fill-down: #43201b;
+  --focus-ring: #9fc2ee;
+  --coin-l: 0.74;
+  --shadow-pop: 0 1px 0 var(--rule-strong), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-quick: 0ms;
+    --dur-flash: 0ms;
+    --dur-count: 0ms;
+    --dur-pulse: 0ms;
+  }
+  *, *::before, *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
