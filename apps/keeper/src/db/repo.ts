@@ -3,6 +3,7 @@ import type { Db } from './db.js';
 import { nowIso } from '../util/time.js';
 import { stringifyBig, parseJson } from '../util/json.js';
 import type { AuctionStatus } from '../chain/types.js';
+import { GovRepo } from './gov-repo.js';
 
 export type FlywheelKind =
   | 'claim'
@@ -16,7 +17,8 @@ export type FlywheelKind =
   | 'auction_start'
   | 'auction_fill'
   | 'fee_accrual'
-  | 'treasury';
+  | 'treasury'
+  | 'governance';
 
 export interface FlywheelEventRow {
   id: number;
@@ -135,8 +137,11 @@ export interface QueuedTradeRow {
 
 export class Repo {
   readonly governance: GovernanceRepo;
+  /** Holder governance (token-weighted voting). */
+  readonly gov: GovRepo;
   constructor(readonly db: Db) {
     this.governance = new GovernanceRepo(db);
+    this.gov = new GovRepo(db);
   }
 
   // ---- kv ----

@@ -12,6 +12,7 @@ import type { BalanceSource } from '../chain/accounts.js';
 import type { ChainClient } from '../chain/types.js';
 import { DRY_RUN_SIG, type TxSender } from '../chain/tx.js';
 import type { Env } from '../config/env.js';
+import { airdropShareBps } from '../config/overrides.js';
 import type { Repo } from '../db/repo.js';
 import { creationBasket, INDEX_DECIMALS } from '../nav/compute.js';
 import type { NavService } from '../nav/service.js';
@@ -149,7 +150,9 @@ export class Flywheel {
     const lpSigs: string[] = [];
     let createdUnits = 0n;
     if (claimed > 0n) {
-      const half = claimed / 2n;
+      // Split per governance (flywheel.airdropShareBps, default 5000 = 50/50): `half` is the LP/burn leg.
+      const airdropBps = airdropShareBps(this.d.repo);
+      const half = claimed - (claimed * BigInt(airdropBps)) / 10_000n;
       // ---- 2a) LP leg (or buyback-and-burn of $FIX6900 when FLYWHEEL_LP_MODE=burn) ----
       try {
         if (this.d.env.FLYWHEEL_LP_MODE === 'burn') lpSigs.push(...(await this.burnLeg(half, dry)));

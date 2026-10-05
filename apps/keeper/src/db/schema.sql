@@ -190,3 +190,46 @@ CREATE TABLE IF NOT EXISTS governance_actions (
   created_ts   TEXT NOT NULL,
   updated_ts   TEXT NOT NULL
 );
+
+-- ---------------------------------------------------------------------------
+-- Holder governance v1: token-weighted, signature-based (gasless) voting by $FIX6900 holders.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS gov_proposals (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind             TEXT NOT NULL,                -- add_asset | remove_asset | set_param
+  payload          TEXT NOT NULL,                -- JSON {mint, symbol?, weightBps?, allowTransferFee?} | {key, value}
+  title            TEXT NOT NULL,
+  description      TEXT NOT NULL,
+  proposer         TEXT NOT NULL,                -- wallet (base58) or 'admin'
+  created_ts       TEXT NOT NULL,
+  snapshot_slot    TEXT NOT NULL,
+  snapshot_supply  TEXT NOT NULL,                -- circulating = total - excluded holders (raw units)
+  start_ts         TEXT NOT NULL,
+  end_ts           TEXT NOT NULL,
+  quorum_bps       INTEGER NOT NULL,
+  status           TEXT NOT NULL,                -- open | passed | failed | queued | executed | cancelled
+  result           TEXT,                         -- JSON tally at close + execution notes
+  queued_action_pda TEXT,
+  queued_sig       TEXT,
+  updated_ts       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS gov_proposals_status ON gov_proposals(status);
+CREATE INDEX IF NOT EXISTS gov_proposals_proposer ON gov_proposals(proposer, status);
+
+CREATE TABLE IF NOT EXISTS gov_votes (
+  proposal_id  INTEGER NOT NULL REFERENCES gov_proposals(id) ON DELETE CASCADE,
+  wallet       TEXT NOT NULL,
+  choice       TEXT NOT NULL,                    -- for | against | abstain
+  weight       TEXT NOT NULL,                    -- raw units at the snapshot
+  sig          TEXT NOT NULL,                    -- base58 ed25519 signature
+  message      TEXT NOT NULL,                    -- exact signed message
+  ts           TEXT NOT NULL,
+  PRIMARY KEY (proposal_id, wallet)
+);
+
+CREATE TABLE IF NOT EXISTS gov_snapshots (
+  proposal_id  INTEGER NOT NULL REFERENCES gov_proposals(id) ON DELETE CASCADE,
+  wallet       TEXT NOT NULL,
+  balance      TEXT NOT NULL,                    -- raw units at snapshot_slot
+  PRIMARY KEY (proposal_id, wallet)
+);

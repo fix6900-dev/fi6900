@@ -17,6 +17,7 @@ import type { TxSender } from '../chain/tx.js';
 import type { MintInfoSource } from '../chain/accounts.js';
 import type { Env } from '../config/env.js';
 import type { MethodologyConfig } from '../config/methodology.config.js';
+import { withConfigOverrides } from '../config/overrides.js';
 import type { Repo } from '../db/repo.js';
 import type { ReconstitutionService } from '../governance/reconstitution.js';
 import type { IndicatedChange } from '../governance/proposals.js';
@@ -61,8 +62,13 @@ export interface MethodologyJobResult {
 export class MethodologyJob {
   constructor(private readonly d: MethodologyJobDeps) {}
 
+  /** Config in force: env/defaults with governance overrides (kv `cfg.*`) applied. */
+  get cfg(): MethodologyConfig {
+    return withConfigOverrides(this.d.cfg, this.d.repo);
+  }
+
   /** The raw universe (before incumbents / denylist), in the source's order. */
-  async universe(universeSize = this.d.cfg.universe.maxCandidates): Promise<TokenUniverseCandidate[]> {
+  async universe(universeSize = this.cfg.universe.maxCandidates): Promise<TokenUniverseCandidate[]> {
     const t = this.d.tokens;
     if (t.universe) return t.universe(universeSize);
     const top = await t.topByVolume(universeSize);
@@ -70,13 +76,13 @@ export class MethodologyJob {
   }
 
   /** Candidate universe: current constituents + the configured universe (CoinGecko category by market cap, or Jupiter by volume). */
-  async buildCandidates(incumbents: readonly string[], universeSize = this.d.cfg.universe.maxCandidates): Promise<ReportCandidate[]> {
+  async buildCandidates(incumbents: readonly string[], universeSize = this.cfg.universe.maxCandidates): Promise<ReportCandidate[]> {
     const top = await this.universe(universeSize).catch((e: Error) => {
       log.warn({ err: e.message }, 'token universe unavailable; using incumbents only');
       return [] as TokenUniverseCandidate[];
     });
     const nominated = new Map(top.map((t) => [t.mint, t]));
-    const mints = [...new Set([...incumbents, ...top.map((t) => t.mint)])].filter((m) => !this.d.cfg.eligibility.denylist.includes(m));
+    const mints = [...new Set([...incumbents, ...top.map((t) => t.mint)])].filter((m) => !this.cfg.eligibility.denylist.includes(m));
     const [md0, infos0, mintInfos] = await Promise.all([this.d.market.getMarketData(mints), this.d.tokens.getTokenInfo(mints), this.d.mints.getMintInfo(mints)]);
     // Universe rows already carry merged Jupiter+CoinGecko info; prefer them over the plain lookup.
     const infos = new Map(infos0);
@@ -84,7 +90,7 @@ export class MethodologyJob {
 
     // Cheap screens first (FDV, 24h volume, price) so the per-token DexScreener pool scan and the Jupiter impact
     // quote only run for plausible names.
-    const e = this.d.cfg.eligibility;
+    const e = this.cfg.eligibility;
     const pre = mints.filter((m) => {
       const d = md0.get(m);
       const cg = infos.get(m)?.cg;
@@ -205,7 +211,7 @@ export class MethodologyJob {
     });
     const incumbents = assets.filter((a) => a.status === 'active').map((a) => a.mint);
     const candidates = await this.buildCandidates(incumbents, opts.universeSize);
-    const run = runMethodology(candidates, new Set(incumbents), this.d.cfg);
+    const run = runMethodology(candidates, new Set(incumbents), this.cfg);
     log.info(
       { universe: candidates.length, eligible: run.eligible.filter((e) => e.eligible).length, selected: run.selection.selected.length, added: run.selection.added.length, removed: run.selection.removed.length, dry, mode: recon.mode },
       'methodology run complete',
@@ -218,23 +224,23 @@ export class MethodologyJob {
 
     // 2) announcement 48h ahead: what is APPROVED for the next window
     const now = new Date();
-    const next = nextReconstitution(now, this.d.cfg);
+    const next = nextReconstitution(now, this.cfg);
     const key = `recon-${next.toISOString().slice(0, 7)}`;
     let announced = false;
     const approved = recon.list('approved');
-    if (isInAnnouncementWindow(now, this.d.cfg) && approved.length > 0) {
+    if (isInAnnouncementWindow(now, this.cfg) && approved.length > 0) {
       const name = (p: { symbol: string | null; mint: string }): string => p.symbol ?? p.mint.slice(0, 6);
       announced = this.d.repo.insertAnnouncement({
         key,
         title: `Reconstitution effective ${next.toISOString().slice(0, 10)} 00:00 UTC`,
-        body: `Additions: ${approved.filter((p) => p.action === 'add').map(name).join(', ') || 'none'}. Deletions: ${approved.filter((p) => p.action === 'remove').map(name).join(', ') || 'none'}. Weights: ${this.d.cfg.weighting.scheme}. Changes are queued through the on-chain timelock and execute after it elapses.`,
+        body: `Additions: ${approved.filter((p) => p.action === 'add').map(name).join(', ') || 'none'}. Deletions: ${approved.filter((p) => p.action === 'remove').map(name).join(', ') || 'none'}. Weights: ${this.cfg.weighting.scheme}. Changes are queued through the on-chain timelock and execute after it elapses.`,
       });
     }
 
     // 3) on the effective date: queue approved proposals through the timelock
     let applied = false;
     const lastRecon = this.d.repo.getKv(LAST_RECON_KEY);
-    const due = isReconstitutionDue(now, lastRecon ? Date.parse(lastRecon) : null, this.d.cfg) && now.getTime() >= next.getTime() - 24 * 3600_000 && now.getUTCDate() === this.d.cfg.reconstitution.dayOfMonth;
+    const due = isReconstitutionDue(now, lastRecon ? Date.parse(lastRecon) : null, this.cfg) && now.getTime() >= next.getTime() - 24 * 3600_000 && now.getUTCDate() === this.cfg.reconstitution.dayOfMonth;
     if (due && !dry) {
       if (approved.length === 0) {
         log.info({ mode: recon.mode }, 'reconstitution window: nothing approved to queue');
@@ -251,7 +257,7 @@ export class MethodologyJob {
       log.info('reconstitution due but DRY_RUN; not queueing on-chain');
     }
 
-    this.d.repo.insertMethodologyRun({ ts: run.ts, configVersion: run.configVersion, config: this.d.cfg, eligible: run.eligible, selected: run.selection, weights: run.weights, dry, applied });
+    this.d.repo.insertMethodologyRun({ ts: run.ts, configVersion: run.configVersion, config: this.cfg, eligible: run.eligible, selected: run.selection, weights: run.weights, dry, applied });
     return { run, universe: candidates.length, announced, applied, proposals: { created: rec.created.length, alreadyOpen: rec.alreadyOpen.length, suppressed: rec.suppressed.length }, mode: recon.mode, candidates };
   }
 }

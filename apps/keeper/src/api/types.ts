@@ -133,7 +133,8 @@ export type FlywheelEventKind =
   | 'auction_start'
   | 'auction_fill'
   | 'fee_accrual'
-  | 'treasury';
+  | 'treasury'
+  | 'governance';
 
 export interface FlywheelEventDto {
   id: number;

@@ -14,6 +14,7 @@ import type { HolderSource } from '../sources/types.js';
 import { childLogger } from '../util/logger.js';
 import type { EventBus } from '../util/events.js';
 import { batch, computeAirdrop, minUnitsForRent, type Payout } from './airdrop.js';
+import { buildHolderExclusions } from './exclusions.js';
 
 const log = childLogger('flywheel.airdrop');
 export const AIRDROP_POOL_KEY = 'airdrop_pool_units';
@@ -45,34 +46,7 @@ export class AirdropRunner {
 
   /** Wallets that must never receive airdrops: LP pools / PDAs (off-curve), program accounts, denylist, our own wallets. */
   async buildExclusions(owners: readonly string[]): Promise<Set<string>> {
-    const ex = new Set<string>(this.d.env.AIRDROP_DENYLIST.split(',').map((s) => s.trim()).filter(Boolean));
-    ex.add(this.d.tx.payer.toBase58());
-    if (this.d.env.TREASURY_WALLET) ex.add(this.d.env.TREASURY_WALLET);
-    const candidates: PublicKey[] = [];
-    for (const o of owners) {
-      let pk: PublicKey;
-      try {
-        pk = new PublicKey(o);
-      } catch {
-        ex.add(o);
-        continue;
-      }
-      if (!PublicKey.isOnCurve(pk.toBytes())) {
-        ex.add(o); // PDA: pool vault authority, program-owned account, etc.
-        continue;
-      }
-      candidates.push(pk);
-    }
-    // Owners that are themselves programs / non-system accounts (e.g. multisig-owned accounts) are excluded too.
-    for (let k = 0; k < candidates.length; k += 100) {
-      const chunk = candidates.slice(k, k + 100);
-      const infos = await this.d.connection.getMultipleAccountsInfo(chunk).catch(() => []);
-      infos.forEach((info, idx) => {
-        const pk = chunk[idx];
-        if (info && pk && (info.executable || !info.owner.equals(new PublicKey('11111111111111111111111111111111')))) ex.add(pk.toBase58());
-      });
-    }
-    return ex;
+    return buildHolderExclusions({ connection: this.d.connection, env: this.d.env, own: [this.d.tx.payer.toBase58()] }, owners);
   }
 
   poolUnits(): bigint {

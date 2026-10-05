@@ -171,8 +171,11 @@ export class ApArbitrageur {
   private async executeRedeem(units: bigint, assets: Parameters<typeof redemptionBasket>[0], supply: bigint, redeemFeeBps: number): Promise<string[]> {
     const payer = this.d.tx.payer.toBase58();
     const sigs: string[] = [];
-    const buyQ = await this.d.quotes.quote({ inputMint: WSOL_MINT, outputMint: this.d.chain.indexMint.toBase58(), amount: units, slippageBps: this.d.env.AP_SLIPPAGE_BPS, swapMode: 'ExactOut' });
+    // ExactIn: Jupiter has no ExactOut route for the Meteora DAMM v2 index pool. Spend the cycle notional and redeem
+    // exactly the units it bought.
+    const buyQ = await this.d.quotes.quote({ inputMint: WSOL_MINT, outputMint: this.d.chain.indexMint.toBase58(), amount: uiToBigint(this.d.env.AP_NOTIONAL_SOL, 9), slippageBps: this.d.env.AP_SLIPPAGE_BPS, maxAccounts: 40 });
     sigs.push(await this.d.tx.sendVersioned(await this.d.quotes.swapTx(buyQ, payer), { label: 'ap buy units' }));
+    units = buyQ.outAmount;
     const redeemTxs = await this.d.chain.buildRedeemTxs(units, this.d.tx.payer);
     sigs.push(...(await this.d.tx.sendMany(redeemTxs, { label: 'ap redeem' })));
     let solReceived = 0n;

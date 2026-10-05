@@ -111,6 +111,23 @@ export const EnvSchema = z.object({
   /** Skip ref-price updates smaller than this (bps) to avoid spamming transactions. */
   REF_PRICE_MIN_CHANGE_BPS: intEnv(25, 0),
 
+  // ---- holder governance (token-weighted, signature-based voting by $FIX6900 holders; docs/governance.md) ----
+  GOV_ENABLED: bool(true),
+  /** Voting window per proposal. */
+  GOV_VOTING_HOURS: numEnv(48, 0.01),
+  /** Quorum: for + against + abstain must reach this share (bps) of the circulating snapshot supply. */
+  GOV_QUORUM_BPS: intEnv(500, 0),
+  /** A holder needs this share (bps) of circulating supply to create a proposal (the admin token bypasses it). */
+  GOV_PROPOSAL_THRESHOLD_BPS: intEnv(50, 0),
+  GOV_MAX_OPEN_PER_WALLET: intEnv(1, 1),
+  /**
+   * Comma-separated whitelist of votable parameter keys (bounds live in governance/params.ts). Default: every
+   * known key. Set to an empty string to allow add/remove proposals only.
+   */
+  GOV_ALLOWED_PARAMS: z.string().default('eligibility.minVolume24hUsd,rebalance.driftRelativeBps,FEE_BURN_PCT,flywheel.airdropShareBps'),
+  /** Dev only: lets a wallet with no snapshot balance propose and vote (weight 1 unit) so a burner can exercise the flow locally. Never set in production. */
+  GOV_DEV_ACCEPT_ANY_BALANCE: bool(false),
+
   // ---- AP arbitrage ----
   AP_ENABLED: bool(true),
   AP_THRESHOLD_BPS: intEnv(75, 1),

@@ -9,6 +9,7 @@ import type { ChainClient, MintInfo } from '../chain/types.js';
 import { DRY_RUN_SIG, type TxSender } from '../chain/tx.js';
 import type { BalanceSource, MintInfoSource } from '../chain/accounts.js';
 import type { Env } from '../config/env.js';
+import { feeBurnPct } from '../config/overrides.js';
 import type { Repo } from '../db/repo.js';
 import { redemptionBasket } from '../nav/compute.js';
 import type { NavService } from '../nav/service.js';
@@ -78,9 +79,9 @@ export class FeeProcessor {
       const estUsd = (Number(units) / 1e6) * nav.nav.navPerUnitUsd;
       log.info({ units: units.toString(), estUsd: estUsd.toFixed(2) }, 'DRY_RUN fee processing');
       this.d.repo.insertFlywheelEvent({ kind: 'redeem', sig: DRY_RUN_SIG, amounts: { units, estUsd, source: 'fees' }, note: 'DRY_RUN fee redemption' });
-      this.d.repo.insertFlywheelEvent({ kind: 'buyback', sig: DRY_RUN_SIG, amounts: { sol: (estUsd * (this.d.env.FEE_BURN_PCT / 100)) / nav.solPriceUsd }, note: 'DRY_RUN buyback' });
+      this.d.repo.insertFlywheelEvent({ kind: 'buyback', sig: DRY_RUN_SIG, amounts: { sol: (estUsd * (feeBurnPct(this.d.env, this.d.repo) / 100)) / nav.solPriceUsd }, note: 'DRY_RUN buyback' });
       this.d.repo.insertFlywheelEvent({ kind: 'burn', sig: DRY_RUN_SIG, amounts: { coin: 0 }, note: 'DRY_RUN burn' });
-      this.d.repo.insertFlywheelEvent({ kind: 'treasury', sig: DRY_RUN_SIG, amounts: { sol: (estUsd * (1 - this.d.env.FEE_BURN_PCT / 100)) / nav.solPriceUsd }, note: 'DRY_RUN treasury' });
+      this.d.repo.insertFlywheelEvent({ kind: 'treasury', sig: DRY_RUN_SIG, amounts: { sol: (estUsd * (1 - feeBurnPct(this.d.env, this.d.repo) / 100)) / nav.solPriceUsd }, note: 'DRY_RUN treasury' });
       return { units, solFromBasket: 0n, buybackSol: 0n, burnedCoin: 0n, treasurySol: 0n, sigs: [DRY_RUN_SIG] };
     }
 
@@ -104,7 +105,7 @@ export class FeeProcessor {
     }
 
     // 4) split
-    const buybackSol = (sol * BigInt(this.d.env.FEE_BURN_PCT)) / 100n;
+    const buybackSol = (sol * BigInt(feeBurnPct(this.d.env, this.d.repo))) / 100n;
     const treasurySol = sol - buybackSol;
     let burned = 0n;
     if (buybackSol > 0n) {

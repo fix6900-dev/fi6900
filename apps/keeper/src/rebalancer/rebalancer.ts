@@ -4,6 +4,7 @@ import { PAUSE_AUCTIONS, type ChainClient } from '../chain/types.js';
 import { DRY_RUN_SIG, type TxSender } from '../chain/tx.js';
 import type { Env } from '../config/env.js';
 import type { MethodologyConfig } from '../config/methodology.config.js';
+import { withConfigOverrides } from '../config/overrides.js';
 import type { Repo } from '../db/repo.js';
 import { driftTriggered, isScheduledRebalanceDue } from '../methodology/schedule.js';
 import type { NavComputed, NavService } from '../nav/service.js';
@@ -38,6 +39,11 @@ export interface RebalanceCheckResult {
 
 export class Rebalancer {
   constructor(private readonly d: RebalancerDeps) {}
+
+  /** Config in force: env/defaults with governance overrides (kv `cfg.*`) applied. */
+  get cfg(): MethodologyConfig {
+    return withConfigOverrides(this.d.cfg, this.d.repo);
+  }
 
   async buildHoldings(nav: NavComputed): Promise<PlanHolding[]> {
     const md = await this.d.market.getMarketData(nav.assets.map((a) => a.mint));
@@ -79,7 +85,7 @@ export class Rebalancer {
         const usd = h ? (Number(amt) / 10 ** h.decimals) * h.priceUsd : 0;
         return { sellMint: q.sell_mint, buyMint: q.buy_mint, sellAmount: amt, sellUsd: usd };
       });
-      plan = capQueued(queued, holdings, this.d.cfg);
+      plan = capQueued(queued, holdings, this.cfg);
       if (!dry) {
         for (const q of queuedRows) this.d.repo.setQueuedStatus(q.id, 'opened');
         for (const q of plan.queued) this.d.repo.enqueueTrade({ ...q, reason: 'queued' });
@@ -87,13 +93,13 @@ export class Rebalancer {
     } else {
       const drifts = driftTriggered(
         nav.nav.holdings.map((h) => ({ mint: h.mint, weightBps: h.weightBps, targetWeightBps: h.targetWeightBps, driftBps: h.driftBps })),
-        this.d.cfg,
+        this.cfg,
       );
       if (opts.force) reason = 'manual';
-      else if (isScheduledRebalanceDue(new Date(), lastMs, this.d.cfg)) reason = 'scheduled';
+      else if (isScheduledRebalanceDue(new Date(), lastMs, this.cfg)) reason = 'scheduled';
       else if (drifts.length > 0) reason = 'drift';
       if (!reason) return { reason: null, plan: null, opened: [], skipped: 'within drift band and not scheduled' };
-      plan = planRebalance(holdings, nav.nav.navUsd, this.d.cfg);
+      plan = planRebalance(holdings, nav.nav.navUsd, this.cfg);
       if (!dry) for (const q of plan.queued) this.d.repo.enqueueTrade({ ...q, reason });
     }
 
@@ -126,7 +132,7 @@ export class Rebalancer {
     const sellPx = nav.prices.get(t.sellMint);
     const buyPx = nav.prices.get(t.buyMint);
     if (!sellPx || !buyPx) throw new Error('missing price');
-    const a = this.d.cfg.rebalance.auction;
+    const a = this.cfg.rebalance.auction;
     const raw = auctionPrices({
       sellPriceUsd: sellPx,
       buyPriceUsd: buyPx,

@@ -149,10 +149,13 @@ export class NavService {
     const indexMint = this.d.chain.indexMint.toBase58();
     const p = (await this.d.market.getPrices([indexMint])).get(indexMint);
     if (p) return p;
-    const notionalSol = uiToBigint(this.d.env.AP_NOTIONAL_SOL, 9);
+    // Spot-ish probe: a tiny two-sided quote (0.01 SOL) so the displayed market price is the pool price, not the
+    // price impact of a trade the size of the AP notional on a shallow pool.
+    const PROBE_SOL = 0.01;
+    const notionalSol = uiToBigint(PROBE_SOL, 9);
     const navPerUnit = this.latest?.nav.navPerUnitUsd ?? 0;
     if (navPerUnit <= 0) return null;
-    const unitsForNotional = uiToBigint((this.d.env.AP_NOTIONAL_SOL * solPriceUsd) / navPerUnit, INDEX_DECIMALS);
+    const unitsForNotional = uiToBigint((PROBE_SOL * solPriceUsd) / navPerUnit, INDEX_DECIMALS);
     const [buy, sell] = await Promise.all([
       this.d.quotes.quote({ inputMint: WSOL_MINT, outputMint: indexMint, amount: notionalSol, slippageBps: 50 }),
       this.d.quotes.quote({ inputMint: indexMint, outputMint: WSOL_MINT, amount: unitsForNotional, slippageBps: 50 }),
