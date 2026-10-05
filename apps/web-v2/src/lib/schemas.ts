@@ -130,6 +130,8 @@ export const FlywheelSchema = z.object({
   airdropRounds: numish,
   buybackSol: numish,
   burnedCoin: numish,
+  arbProfitSol: numish.optional(),
+  arbTrades: numish.optional(),
   treasurySol: numish,
   next: z.object({
     airdropAt: z.string().nullable(),

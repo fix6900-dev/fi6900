@@ -118,6 +118,8 @@ export class MockProvider implements KeeperDataProvider {
       buybackSol: sum('buyback', 'sol'),
       burnedCoin: sum('burn', 'coin'),
       treasurySol: sum('treasury', 'sol'),
+      arbProfitSol: sum('create', 'profitSol') + sum('redeem', 'profitSol'),
+      arbTrades: 0,
       next: {
         airdropAt: next.toISOString(),
         rebalanceCheckAt: new Date(Math.ceil(Date.now() / 60_000) * 60_000).toISOString(),

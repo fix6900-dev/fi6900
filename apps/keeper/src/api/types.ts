@@ -109,6 +109,9 @@ export interface FlywheelDto {
   buybackSol: number;
   burnedCoin: number;
   treasurySol: number;
+  /** Keeper arbitrage profit vs NAV (SOL) from AP create/redeem/inventory trades; accrues to the treasury wallet. */
+  arbProfitSol: number;
+  arbTrades: number;
   next: {
     airdropAt: string | null;
     /** next drift check (every REBALANCE_CHECK_SEC) */

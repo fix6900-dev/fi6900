@@ -242,6 +242,8 @@ export function mockFlywheel(now = Date.now()): Flywheel {
     buybackSol: 611.08,
     burnedCoin: 48_212_911,
     treasurySol: 203.69,
+    arbProfitSol: 12.4,
+    arbTrades: 37,
     next: { airdropAt: next.toISOString(), rebalanceCheckAt: reb.toISOString() },
   };
 }

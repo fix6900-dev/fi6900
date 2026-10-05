@@ -195,6 +195,7 @@ export class LiveProvider implements KeeperDataProvider {
 
   async flywheel(): Promise<FlywheelDto> {
     const repo = this.d.repo;
+    const solPriceUsd = (await this.d.nav.get().catch(() => null))?.solPriceUsd ?? 0;
     const totals = repo.airdropTotals();
     let unclaimed: FlywheelDto['creatorFeesUnclaimed'] = null;
     if (this.d.claimer && this.d.devWallet) {
@@ -214,6 +215,8 @@ export class LiveProvider implements KeeperDataProvider {
       buybackSol: repo.sumFlywheel('buyback', 'sol'),
       burnedCoin: repo.sumFlywheel('burn', 'coin'),
       treasurySol: repo.sumFlywheel('treasury', 'sol'),
+      arbProfitSol: repo.sumFlywheel('create', 'profitSol') + repo.sumFlywheel('redeem', 'profitSol') + (repo.sumFlywheel('redeem', 'profitUsd') + repo.sumFlywheel('create', 'profitUsd')) / Math.max(1, solPriceUsd),
+      arbTrades: repo.countFlywheel('create') + repo.countFlywheel('redeem'),
       next: {
         airdropAt: this.d.scheduler?.nextRun('flywheel')?.toISOString() ?? null,
         rebalanceCheckAt: this.d.scheduler?.nextRun('rebalance-check')?.toISOString() ?? null,

@@ -107,6 +107,13 @@ export function FlywheelView() {
           <dd className="faint">{data ? `${num(data.buybackSol, 2)} SOL of buybacks` : ""}</dd>
         </div>
         <div>
+          <dt className="micro muted">Arbitrage profit</dt>
+          <dd>
+            <Figure value={data?.arbProfitSol ?? 0} format={(n) => n.toFixed(2)} /> <span className="unit">SOL</span>
+          </dd>
+          <dd className="faint">{data ? `${(data.arbTrades ?? 0).toLocaleString()} keeper trades vs NAV · accrues to treasury` : ""}</dd>
+        </div>
+        <div>
           <dt className="micro muted">Next airdrop</dt>
           <dd>
             {airdropAt ? (

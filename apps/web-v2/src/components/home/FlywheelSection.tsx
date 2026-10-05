@@ -46,6 +46,13 @@ export function FlywheelSection() {
               <Figure value={data?.burnedCoin} format={(n) => compact(n, 2)} /> <span className="unit">$FIX6900</span>
             </dd>
           </div>
+          <div>
+            <dt className="micro muted">Arbitrage profit</dt>
+            <dd>
+              <Figure value={data?.arbProfitSol ?? 0} format={(n) => n.toFixed(2)} /> <span className="unit">SOL</span>
+            </dd>
+            <dd className="faint">{data ? `${(data.arbTrades ?? 0).toLocaleString()} trades keeping the pool at NAV` : ""}</dd>
+          </div>
         </dl>
       </div>
       {idle && <p className="faint idle-note">Counters start when $FIX6900 launches. Coin mint not set on devnet.</p>}
