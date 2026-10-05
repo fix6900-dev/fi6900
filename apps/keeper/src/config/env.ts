@@ -141,7 +141,7 @@ export const EnvSchema = z.object({
   FLYWHEEL_RUN_ON_BOOT: bool(false),
   /** Smallest excess worth recycling (SOL). */
   KEEPER_RECYCLE_MIN_SOL: numEnv(0.05, 0),
-  AIRDROP_BATCH_SIZE: intEnv(18, 1),
+  AIRDROP_BATCH_SIZE: intEnv(6, 1),
   AIRDROP_DENYLIST: z.string().default(''),
   ATA_RENT_LAMPORTS: intEnv(2_039_280),
   FEE_BURN_PCT: intEnv(75, 0),
