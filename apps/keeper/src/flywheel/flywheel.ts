@@ -5,7 +5,8 @@
  *                      ->  50% airdrop  : buy basket -> create units -> pro-rata airdrop to $FIX6900 holders
  */
 import { PublicKey } from '@solana/web3.js';
-import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, createBurnCheckedInstruction, getAssociatedTokenAddressSync } from '@solana/spl-token';
+import type { MintInfoSource } from '../chain/accounts.js';
 import { SystemProgram } from '@solana/web3.js';
 import type { BalanceSource } from '../chain/accounts.js';
 import type { ChainClient } from '../chain/types.js';
@@ -40,6 +41,9 @@ export interface FlywheelDeps {
   balances?: BalanceSource;
   /** Keeper wallet (arbitrage profits accrue here); excess above KEEPER_SOL_CEILING is recycled into the flywheel. */
   keeperTx?: TxSender;
+  /** $FIX6900 coin mint + mint reader (burn mode). */
+  coinMint?: PublicKey;
+  mints?: MintInfoSource;
 }
 
 export interface FlywheelCycleResult {
@@ -134,11 +138,12 @@ export class Flywheel {
     let createdUnits = 0n;
     if (claimed > 0n) {
       const half = claimed / 2n;
-      // ---- 2a) LP leg ----
+      // ---- 2a) LP leg (or buyback-and-burn of $FIX6900 when FLYWHEEL_LP_MODE=burn) ----
       try {
-        lpSigs.push(...(await this.lpLeg(half, nav.nav.navPerUnitUsd, nav.solPriceUsd, dry)));
+        if (this.d.env.FLYWHEEL_LP_MODE === 'burn') lpSigs.push(...(await this.burnLeg(half, dry)));
+        else lpSigs.push(...(await this.lpLeg(half, nav.nav.navPerUnitUsd, nav.solPriceUsd, dry)));
       } catch (err) {
-        log.error({ err: (err as Error).message }, 'LP leg failed');
+        log.error({ err: (err as Error).message, mode: this.d.env.FLYWHEEL_LP_MODE }, 'LP/burn leg failed');
       }
       // ---- 2b) airdrop leg: buy basket -> create units ----
       try {
@@ -154,6 +159,36 @@ export class Flywheel {
       airdrop = await this.d.airdrop.run({ solPriceUsd: nav.solPriceUsd, navPerUnitUsd: nav.nav.navPerUnitUsd, dry });
     }
     return { claimedLamports: claimed, lpSigs, createdUnits, airdrop };
+  }
+
+  /** Burn leg: buy $FIX6900 on Jupiter with the dev wallet and burn it (provable SPL burn). */
+  private async burnLeg(lamports: bigint, dry: boolean): Promise<string[]> {
+    if (!this.d.coinMint || !this.d.mints || !this.d.balances) throw new Error('burn mode needs coinMint, mints and balances');
+    const coin = this.d.coinMint;
+    if (dry) {
+      this.d.repo.insertFlywheelEvent({ kind: 'buyback', sig: DRY_RUN_SIG, amounts: { sol: Number(lamports) / 1e9, source: 'flywheel' }, note: 'DRY_RUN flywheel buyback' });
+      this.d.repo.insertFlywheelEvent({ kind: 'burn', sig: DRY_RUN_SIG, amounts: { coin: 0, source: 'flywheel' }, note: 'DRY_RUN flywheel burn' });
+      return [DRY_RUN_SIG];
+    }
+    const sigs: string[] = [];
+    const q = await this.d.quotes.quote({ inputMint: WSOL_MINT, outputMint: coin.toBase58(), amount: lamports, slippageBps: this.d.env.AP_SLIPPAGE_BPS });
+    const buySig = await this.d.devTx.sendVersioned(await this.d.quotes.swapTx(q, this.d.devWallet.toBase58()), { label: 'flywheel buyback $FIX6900' });
+    sigs.push(buySig);
+    this.d.repo.insertFlywheelEvent({ kind: 'buyback', sig: buySig, amounts: { sol: Number(lamports) / 1e9, coin: q.outAmount, source: 'flywheel' }, note: 'creator-fee buyback of $FIX6900' });
+    const info = (await this.d.mints.getMintInfo([coin.toBase58()])).get(coin.toBase58());
+    const decimals = info?.decimals ?? 6;
+    const program = info ? new PublicKey(info.tokenProgram) : TOKEN_2022_PROGRAM_ID;
+    const bal = await this.d.balances.getTokenBalance(this.d.devWallet, coin, program);
+    const toBurn = bal < q.outAmount ? bal : q.outAmount;
+    if (toBurn > 0n) {
+      const ata = getAssociatedTokenAddressSync(coin, this.d.devWallet, false, program);
+      const burnSig = await this.d.devTx.sendIxs([createBurnCheckedInstruction(ata, coin, this.d.devWallet, toBurn, decimals, [], program)], { label: 'flywheel burn $FIX6900' });
+      sigs.push(burnSig);
+      this.d.repo.insertFlywheelEvent({ kind: 'burn', sig: burnSig, amounts: { coin: Number(toBurn) / 10 ** decimals, coinRaw: toBurn, source: 'flywheel' }, note: 'provable SPL burn (creator fees)' });
+      this.d.events.emit('flywheel_event', { kind: 'burn', coin: Number(toBurn) / 10 ** decimals, sig: burnSig });
+      log.info({ sol: Number(lamports) / 1e9, burned: Number(toBurn) / 10 ** decimals, buySig, burnSig }, 'flywheel buyback and burn done');
+    }
+    return sigs;
   }
 
   /**

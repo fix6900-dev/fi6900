@@ -97,7 +97,7 @@ export async function createLiveContext(overrides: Partial<Record<keyof Env, str
   if (devWallet && devTx && coinMint) {
     airdrop = new AirdropRunner({ connection, tx: devTx, holders: sources.holders, repo, env, events, indexMint, coinMint });
     const lp: LpProvider = env.METEORA_POOL ? new MeteoraLpProvider(connection, devTx, new PublicKey(env.METEORA_POOL), indexMint) : new HoldLpProvider();
-    flywheel = new Flywheel({ chain, devTx, devWallet: devWallet.publicKey, nav, quotes: sources.quotes, claimer, lp, airdrop, repo, env, events, balances, keeperTx: tx });
+    flywheel = new Flywheel({ chain, devTx, devWallet: devWallet.publicKey, nav, quotes: sources.quotes, claimer, lp, airdrop, repo, env, events, balances, keeperTx: tx, coinMint, mints });
   } else {
     log.warn('DEV_WALLET and/or COIN_MINT not set; flywheel disabled');
   }
@@ -144,7 +144,7 @@ export function registerJobs(ctx: LiveContext): void {
   scheduler.addInterval('ap-check', env.AP_CHECK_SEC * 1000, () => ctx.ap.check());
   if (ctx.flywheel) {
     const fw = ctx.flywheel;
-    scheduler.addInterval('flywheel', env.DIST_INTERVAL_MIN * 60_000, () => fw.runCycle());
+    scheduler.addInterval('flywheel', env.DIST_INTERVAL_MIN * 60_000, () => fw.runCycle(), { runImmediately: env.FLYWHEEL_RUN_ON_BOOT });
   }
   scheduler.addCron('fee-processing', env.FEE_PROCESS_CRON, async () => {
     ctx.ap.resetCycleBudget();

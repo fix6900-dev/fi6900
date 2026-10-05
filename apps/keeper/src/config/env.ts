@@ -133,6 +133,10 @@ export const EnvSchema = z.object({
   PUMP_SWEEP_MIN: numEnv(1000, 0),
   /** Keeper working-capital ceiling (SOL). Each flywheel round recycles any excess above it into the 50/50 split. */
   KEEPER_SOL_CEILING: numEnv(1, 0),
+  /** What the non-airdrop half of each round does: 'lp' = permanent Index/SOL liquidity, 'burn' = buy $FIX6900 on the market and burn it. */
+  FLYWHEEL_LP_MODE: z.enum(['lp', 'burn']).default('lp'),
+  /** Run one flywheel round immediately when the keeper boots (then every DIST_INTERVAL_MIN). */
+  FLYWHEEL_RUN_ON_BOOT: bool(false),
   /** Smallest excess worth recycling (SOL). */
   KEEPER_RECYCLE_MIN_SOL: numEnv(0.05, 0),
   AIRDROP_BATCH_SIZE: intEnv(18, 1),
