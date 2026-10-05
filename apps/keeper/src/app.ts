@@ -97,7 +97,7 @@ export async function createLiveContext(overrides: Partial<Record<keyof Env, str
   if (devWallet && devTx && coinMint) {
     airdrop = new AirdropRunner({ connection, tx: devTx, holders: sources.holders, repo, env, events, indexMint, coinMint });
     const lp: LpProvider = env.METEORA_POOL ? new MeteoraLpProvider(connection, devTx, new PublicKey(env.METEORA_POOL), indexMint) : new HoldLpProvider();
-    flywheel = new Flywheel({ chain, devTx, devWallet: devWallet.publicKey, nav, quotes: sources.quotes, claimer, lp, airdrop, repo, env, events });
+    flywheel = new Flywheel({ chain, devTx, devWallet: devWallet.publicKey, nav, quotes: sources.quotes, claimer, lp, airdrop, repo, env, events, balances });
   } else {
     log.warn('DEV_WALLET and/or COIN_MINT not set; flywheel disabled');
   }

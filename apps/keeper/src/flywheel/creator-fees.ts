@@ -23,6 +23,7 @@
  */
 import { createRequire } from 'node:module';
 import { PublicKey, type Connection, type TransactionInstruction } from '@solana/web3.js';
+import { getAssociatedTokenAddressSync } from '@solana/spl-token';
 import { childLogger } from '../util/logger.js';
 
 const log = childLogger('flywheel.creator-fees');
@@ -44,7 +45,9 @@ export interface CreatorFeeClaimer {
   /** Per-program breakdown (for `/v1/flywheel.creatorFeesUnclaimed*`). */
   pendingBreakdown(creator: PublicKey): Promise<CreatorFeeBreakdown>;
   /** Instructions that move the fees into the creator wallet. May be empty. */
-  buildClaimIxs(creator: PublicKey): Promise<TransactionInstruction[]>;
+  buildClaimIxs(creator: PublicKey, extraQuoteMints?: readonly PublicKey[]): Promise<TransactionInstruction[]>;
+  /** Raw amount of a quote token (e.g. $PUMP) sitting in the creator vaults of both programs, claimable. */
+  pendingQuote(creator: PublicKey, quoteMint: PublicKey): Promise<bigint>;
 }
 
 type PumpSdkModule = typeof import('@pump-fun/pump-sdk');
@@ -53,6 +56,7 @@ interface PumpSdkLike {
   getCreatorVaultBalance(creator: PublicKey): Promise<{ toString(): string }>;
   getCreatorVaultBalanceBothPrograms(creator: PublicKey): Promise<{ toString(): string }>;
   collectCoinCreatorFeeInstructions(creator: PublicKey, feePayer?: PublicKey): Promise<TransactionInstruction[]>;
+  collectCoinCreatorFeeAllQuotesInstructions(creator: PublicKey, feePayer?: PublicKey, extraQuoteMints?: readonly PublicKey[]): Promise<TransactionInstruction[]>;
 }
 
 let pumpModule: PumpSdkModule | undefined;
@@ -102,11 +106,28 @@ export class PumpCreatorFeeClaimer implements CreatorFeeClaimer {
     return { bondingCurve, pumpSwap: all > bondingCurve ? all - bondingCurve : 0n, total: all };
   }
 
-  async buildClaimIxs(creator: PublicKey): Promise<TransactionInstruction[]> {
-    const ixs = await this.load().collectCoinCreatorFeeInstructions(creator, creator);
+  /**
+   * pump.fun (2026) quotes new coins in $PUMP, so creator fees accrue as PUMP in the vaults' token ATAs rather than as
+   * lamports. The all-quotes variant claims SOL and every listed/extra quote mint in one go.
+   */
+  async buildClaimIxs(creator: PublicKey, extraQuoteMints: readonly PublicKey[] = []): Promise<TransactionInstruction[]> {
+    const ixs = await this.load().collectCoinCreatorFeeAllQuotesInstructions(creator, creator, extraQuoteMints);
     const programs = new Set(ixs.map((ix) => ix.programId.toBase58()));
-    log.debug({ n: ixs.length, programs: [...programs] }, 'claim instructions built');
+    log.debug({ n: ixs.length, programs: [...programs] }, 'claim instructions built (all quotes)');
     return ixs;
+  }
+
+  async pendingQuote(creator: PublicKey, quoteMint: PublicKey): Promise<bigint> {
+    const vaults = [creatorVaultPda(creator), PublicKey.findProgramAddressSync([Buffer.from('creator_vault'), creator.toBuffer()], PUMP_SWAP_PROGRAM_ID)[0]];
+    const mintInfo = await this.connection.getAccountInfo(quoteMint);
+    if (!mintInfo) return 0n;
+    let total = 0n;
+    for (const v of vaults) {
+      const ata = getAssociatedTokenAddressSync(quoteMint, v, true, mintInfo.owner);
+      const bal = await this.connection.getTokenAccountBalance(ata).catch(() => null);
+      if (bal) total += BigInt(bal.value.amount);
+    }
+    return total;
   }
 }
 
@@ -122,5 +143,8 @@ export class StaticCreatorFeeClaimer implements CreatorFeeClaimer {
   async buildClaimIxs(): Promise<TransactionInstruction[]> {
     this.lamports = 0n;
     return [];
+  }
+  async pendingQuote(): Promise<bigint> {
+    return 0n;
   }
 }

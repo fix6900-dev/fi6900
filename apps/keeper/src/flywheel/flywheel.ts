@@ -4,7 +4,9 @@
  *   claim creator fees ->  50% LP leg   : 25% buys $FI6900 on Jupiter, paired with 25% SOL -> Meteora
  *                      ->  50% airdrop  : buy basket -> create units -> pro-rata airdrop to $FIX6900 holders
  */
-import type { PublicKey } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
+import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import type { BalanceSource } from '../chain/accounts.js';
 import type { ChainClient } from '../chain/types.js';
 import { DRY_RUN_SIG, type TxSender } from '../chain/tx.js';
 import type { Env } from '../config/env.js';
@@ -33,6 +35,8 @@ export interface FlywheelDeps {
   repo: Repo;
   env: Env;
   events: EventBus;
+  /** Dev-wallet token balances (PUMP reward sweep). */
+  balances?: BalanceSource;
 }
 
 export interface FlywheelCycleResult {
@@ -58,15 +62,48 @@ export class Flywheel {
       return 0n;
     });
     const minClaim = uiToBigint(this.d.env.MIN_CLAIM_SOL, 9);
-    if (pending >= minClaim && pending > 0n) {
-      const ixs = await this.d.claimer.buildClaimIxs(this.d.devWallet);
+    const pumpMintKey = new PublicKey(this.d.env.PUMP_REWARD_MINT);
+    const pendingPump = this.d.env.PUMP_SWEEP_ENABLED ? await this.d.claimer.pendingQuote(this.d.devWallet, pumpMintKey).catch(() => 0n) : 0n;
+    const pumpReady = Number(pendingPump) / 1e6 >= this.d.env.PUMP_SWEEP_MIN && pendingPump > 0n;
+    if ((pending >= minClaim && pending > 0n) || pumpReady) {
+      const ixs = await this.d.claimer.buildClaimIxs(this.d.devWallet, [pumpMintKey]);
+      log.info({ pendingSol: Number(pending) / 1e9, pendingPump: Number(pendingPump) / 1e6, ixs: ixs.length }, 'claiming creator fees (SOL + PUMP quotes)');
       const sig = ixs.length ? await this.d.devTx.sendIxs(ixs, { label: 'collect creator fees' }) : DRY_RUN_SIG;
       claimed = pending;
-      this.d.repo.insertFlywheelEvent({ kind: 'claim', sig: dry ? DRY_RUN_SIG : sig, amounts: { sol: Number(pending) / 1e9, lamports: pending }, note: 'pump.fun + PumpSwap creator fees' });
-      this.d.events.emit('flywheel_event', { kind: 'claim', sol: Number(pending) / 1e9 });
-      log.info({ sol: Number(pending) / 1e9, sig }, 'creator fees claimed');
+      if (pending > 0n) {
+        this.d.repo.insertFlywheelEvent({ kind: 'claim', sig: dry ? DRY_RUN_SIG : sig, amounts: { sol: Number(pending) / 1e9, lamports: pending }, note: 'pump.fun + PumpSwap creator fees (SOL)' });
+        this.d.events.emit('flywheel_event', { kind: 'claim', sol: Number(pending) / 1e9 });
+      }
+      log.info({ sol: Number(pending) / 1e9, pump: Number(pendingPump) / 1e6, sig }, 'creator fees claimed; PUMP (if any) now in the dev wallet for the sweep');
     } else {
       log.info({ pendingSol: Number(pending) / 1e9, minSol: this.d.env.MIN_CLAIM_SOL }, 'creator fees below claim threshold');
+    }
+
+    // ---- 1b) PUMP reward sweep: pump.fun now pays creator rewards in $PUMP. Whatever PUMP sits in the dev wallet
+    // (claimed on pump.fun manually or by the keeper) is swapped to SOL on Jupiter and joins the claimed amount.
+    if (this.d.env.PUMP_SWEEP_ENABLED && this.d.balances) {
+      try {
+        const pumpMint = new PublicKey(this.d.env.PUMP_REWARD_MINT);
+        // $PUMP is a Token-2022 mint; read both token programs so the sweep is program-agnostic.
+        const [legacyBal, t22Bal] = await Promise.all([
+          this.d.balances.getTokenBalance(this.d.devWallet, pumpMint, TOKEN_PROGRAM_ID).catch(() => 0n),
+          this.d.balances.getTokenBalance(this.d.devWallet, pumpMint, TOKEN_2022_PROGRAM_ID).catch(() => 0n),
+        ]);
+        const pumpRaw = legacyBal + t22Bal;
+        const pumpUi = Number(pumpRaw) / 1e6; // $PUMP has 6 decimals
+        if (pumpUi >= this.d.env.PUMP_SWEEP_MIN && pumpRaw > 0n) {
+          const q = await this.d.quotes.quote({ inputMint: pumpMint.toBase58(), outputMint: WSOL_MINT, amount: pumpRaw, slippageBps: this.d.env.AP_SLIPPAGE_BPS });
+          const sig = dry ? DRY_RUN_SIG : await this.d.devTx.sendVersioned(await this.d.quotes.swapTx(q, this.d.devWallet.toBase58()), { label: 'sweep PUMP rewards -> SOL' });
+          claimed += q.outAmount;
+          this.d.repo.insertFlywheelEvent({ kind: 'claim', sig, amounts: { sol: Number(q.outAmount) / 1e9, lamports: q.outAmount, pump: pumpUi }, note: 'pump.fun creator rewards paid in $PUMP, swept to SOL' });
+          this.d.events.emit('flywheel_event', { kind: 'claim', sol: Number(q.outAmount) / 1e9 });
+          log.info({ pump: pumpUi, sol: Number(q.outAmount) / 1e9, sig }, 'PUMP creator rewards swept to SOL');
+        } else if (pumpUi > 0) {
+          log.info({ pump: pumpUi, min: this.d.env.PUMP_SWEEP_MIN }, 'PUMP rewards below sweep threshold');
+        }
+      } catch (err) {
+        log.warn({ err: (err as Error).message }, 'PUMP sweep failed');
+      }
     }
 
     const lpSigs: string[] = [];
@@ -95,24 +132,20 @@ export class Flywheel {
     return { claimedLamports: claimed, lpSigs, createdUnits, airdrop };
   }
 
-  /** 50% of the LP half buys $FI6900 on Jupiter; the other 50% stays SOL; both go into Meteora. */
+  /**
+   * LP leg: half of the lamports CREATE index units in-kind at NAV (buying from the pool would move a shallow pool
+   * against ourselves); the other half stays SOL; both go into Meteora as a permanent position.
+   */
   private async lpLeg(lamports: bigint, navPerUnit: number, solUsd: number, dry: boolean): Promise<string[]> {
     const sigs: string[] = [];
     const buySol = lamports / 2n;
     const pairSol = lamports - buySol;
-    const indexMint = this.d.chain.indexMint.toBase58();
-    let indexBought = uiToBigint(((Number(buySol) / 1e9) * solUsd) / Math.max(navPerUnit, 1e-9), INDEX_DECIMALS);
+    const indexBought = await this.createUnitsFromSol(buySol, navPerUnit, solUsd, dry, { toAirdropPool: false, source: 'lp' });
+    this.d.repo.insertFlywheelEvent({ kind: 'buy_index', sig: dry ? DRY_RUN_SIG : 'see create', amounts: { sol: Number(buySol) / 1e9, units: indexBought }, note: dry ? 'DRY_RUN LP leg creation at NAV' : 'LP leg: units created in-kind at NAV' });
     if (dry) {
-      this.d.repo.insertFlywheelEvent({ kind: 'buy_index', sig: DRY_RUN_SIG, amounts: { sol: Number(buySol) / 1e9, units: indexBought }, note: 'DRY_RUN LP leg buy' });
       this.d.repo.insertFlywheelEvent({ kind: 'add_lp', sig: DRY_RUN_SIG, amounts: { sol: Number(pairSol) / 1e9, units: indexBought, pool: this.d.env.METEORA_POOL ?? null }, note: 'DRY_RUN add liquidity' });
       return [DRY_RUN_SIG];
     }
-    const q = await this.d.quotes.quote({ inputMint: WSOL_MINT, outputMint: indexMint, amount: buySol, slippageBps: this.d.env.AP_SLIPPAGE_BPS });
-    const buySig = await this.d.devTx.sendVersioned(await this.d.quotes.swapTx(q, this.d.devWallet.toBase58()), { label: 'LP leg: buy $FI6900' });
-    sigs.push(buySig);
-    indexBought = q.outAmount;
-    this.d.repo.insertFlywheelEvent({ kind: 'buy_index', sig: buySig, amounts: { sol: Number(buySol) / 1e9, units: indexBought }, note: 'LP leg buy on Jupiter' });
-
     const lp = await this.d.lp.addLiquidity({ owner: this.d.devWallet, indexAmount: indexBought, solLamports: pairSol });
     sigs.push(...lp.sigs);
     this.d.repo.insertFlywheelEvent({
@@ -126,7 +159,9 @@ export class Flywheel {
   }
 
   /** Buys the creation basket with SOL on Jupiter, then creates units in kind. Units go to the airdrop pool. */
-  private async createUnitsFromSol(lamports: bigint, navPerUnit: number, solUsd: number, dry: boolean): Promise<bigint> {
+  private async createUnitsFromSol(lamports: bigint, navPerUnit: number, solUsd: number, dry: boolean, opts: { toAirdropPool?: boolean; source?: string } = {}): Promise<bigint> {
+    const toPool = opts.toAirdropPool ?? true;
+    const source = opts.source ?? 'flywheel';
     if (navPerUnit <= 0) throw new Error('nav per unit unknown');
     const usd = (Number(lamports) / 1e9) * solUsd;
     // 2% headroom for slippage + mint fee
@@ -136,8 +171,8 @@ export class Flywheel {
     const fund = nav.fund;
     const netUnits = units - (units * BigInt(fund.mintFeeBps)) / 10_000n;
     if (dry) {
-      this.d.repo.insertFlywheelEvent({ kind: 'create', sig: DRY_RUN_SIG, amounts: { units, netUnits, sol: Number(lamports) / 1e9, source: 'flywheel' }, note: 'DRY_RUN airdrop leg creation' });
-      this.d.airdrop.addToPool(netUnits);
+      this.d.repo.insertFlywheelEvent({ kind: 'create', sig: DRY_RUN_SIG, amounts: { units, netUnits, sol: Number(lamports) / 1e9, source }, note: `DRY_RUN ${source} leg creation` });
+      if (toPool) this.d.airdrop.addToPool(netUnits);
       return netUnits;
     }
     if (fund.openAuctions > 0) throw new Error('auctions open; cannot begin_mint');
@@ -150,8 +185,8 @@ export class Flywheel {
     }
     const txs = await this.d.chain.buildMintTxs(units, this.d.devWallet);
     sigs.push(...(await this.d.devTx.sendMany(txs, { label: 'flywheel mint' })));
-    this.d.airdrop.addToPool(netUnits);
-    this.d.repo.insertFlywheelEvent({ kind: 'create', sig: sigs[sigs.length - 1] ?? DRY_RUN_SIG, amounts: { units, netUnits, sol: Number(lamports) / 1e9, legs: sigs, source: 'flywheel' }, note: 'airdrop leg: basket bought and units created' });
+    if (toPool) this.d.airdrop.addToPool(netUnits);
+    this.d.repo.insertFlywheelEvent({ kind: 'create', sig: sigs[sigs.length - 1] ?? DRY_RUN_SIG, amounts: { units, netUnits, sol: Number(lamports) / 1e9, legs: sigs, source }, note: `${source} leg: basket bought and units created in-kind` });
     this.d.events.emit('flywheel_event', { kind: 'create', units: netUnits.toString() });
     return netUnits;
   }
