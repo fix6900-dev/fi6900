@@ -338,8 +338,10 @@ export class Repo {
   }
 
   airdropTotals(): { rounds: number; units: bigint } {
-    const r = this.db.prepare<[], { n: number; total: string | null }>('SELECT COUNT(*) n, SUM(CAST(total_units AS INTEGER)) total FROM airdrop_rounds').get();
-    return { rounds: r?.n ?? 0, units: BigInt(Math.round(Number(r?.total ?? 0))) };
+    // Units = confirmed payouts only (a round whose batches failed re-pays those shares in a later round).
+    const r = this.db.prepare<[], { n: number }>('SELECT COUNT(*) n FROM airdrop_rounds').get();
+    const p = this.db.prepare<[], { total: string | null }>("SELECT SUM(CAST(units AS INTEGER)) total FROM airdrop_payouts WHERE sig != 'failed' AND sig != 'dry-run'").get();
+    return { rounds: r?.n ?? 0, units: BigInt(Math.round(Number(p?.total ?? 0))) };
   }
 
   // ---- carry ----
