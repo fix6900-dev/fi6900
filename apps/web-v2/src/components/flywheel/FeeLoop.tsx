@@ -44,7 +44,7 @@ function build(data: Flywheel | undefined) {
   const t = {
     A: ["$FIX6900 creator fees", "pump.fun and PumpSwap"],
     B: ["Keeper", "claims, splits, signs"],
-    C: ["50% liquidity", "FI6900/SOL pool, permanent"],
+    C: ["50% liquidity", "FIX6900 Index/SOL pool, permanent"],
     D: ["50% basket", "buy coins, mint units"],
     E: ["Airdrop", "to $FIX6900 holders every 15 min"],
     F: ["Index fees", "0.5% in, 0.5% out, 1% a year"],
@@ -126,7 +126,7 @@ function build(data: Flywheel | undefined) {
 function Diagram({ layout, flows, cls }: { layout: ReturnType<typeof build>["wide"]; flows: Flows; cls: string }) {
   const [W, H] = layout.vb;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className={`loop ${cls}`} role="img" aria-label="Fee flow. $FIX6900 creator fees go to the keeper, which splits them between FI6900/SOL liquidity and a basket purchase that is airdropped to $FIX6900 holders. Index fees buy back and burn $FIX6900, which lowers $FIX6900 supply and feeds the creator fees again.">
+    <svg viewBox={`0 0 ${W} ${H}`} className={`loop ${cls}`} role="img" aria-label="Fee flow. $FIX6900 creator fees go to the keeper, which splits them between FIX6900 Index/SOL liquidity and a basket purchase that is airdropped to $FIX6900 holders. Index fees buy back and burn $FIX6900, which lowers $FIX6900 supply and feeds the creator fees again.">
       <defs>
         <marker id={`ak-${cls}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
           <path d="M0,0 L8,4 L0,8 z" className="mk-ink" />

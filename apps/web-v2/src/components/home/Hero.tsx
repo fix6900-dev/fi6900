@@ -10,6 +10,7 @@ import { Countdown, useSecondsLeft } from "../ui/Countdown";
 import { Delta } from "../ui/Delta";
 import { Figure } from "../ui/Figure";
 import { Flash } from "../ui/Flash";
+import { Address } from "../ui/Address";
 import { Fn, Notes, type Note } from "../ui/Fn";
 import { Level } from "../ui/Level";
 import { Needle } from "../ui/Needle";
@@ -87,6 +88,17 @@ export function Hero() {
           </Link>
         </div>
       </div>
+
+      <dl className="ca-strip" aria-label="Contract addresses">
+        <div className="ca">
+          <dt className="micro muted">$FIX6900 coin · CA</dt>
+          <dd>{env.coinMint ? <Address value={env.coinMint} kind="token" head={6} tail={6} /> : <span className="faint">not set</span>}</dd>
+        </div>
+        <div className="ca">
+          <dt className="micro muted">FIX6900 Index units · CA (the basket)</dt>
+          <dd>{(env.indexMint || fund?.indexMint) ? <Address value={env.indexMint || fund!.indexMint} kind="token" head={6} tail={6} /> : <span className="faint">not set</span>}</dd>
+        </div>
+      </dl>
 
       <dl className="kf-strip">
         <div className="kf">

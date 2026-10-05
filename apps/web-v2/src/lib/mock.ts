@@ -256,7 +256,7 @@ export function mockEvent(i: number, ts: number, seed = "events"): FlywheelEvent
   switch (kind) {
     case "claim": amounts.sol = +(r() * 6 + 0.4).toFixed(3); note = "Creator fee claim (pump + PumpSwap)"; break;
     case "buy_index": amounts.sol = +(r() * 3).toFixed(3); amounts.units = +(r() * 2400).toFixed(2); note = "Bought FIX6900 Index on Jupiter"; break;
-    case "add_lp": amounts.sol = +(r() * 3).toFixed(3); amounts.units = +(r() * 2400).toFixed(2); note = "Added FI6900/SOL liquidity (Meteora)"; break;
+    case "add_lp": amounts.sol = +(r() * 3).toFixed(3); amounts.units = +(r() * 2400).toFixed(2); note = "Added FIX6900 Index/SOL liquidity (Meteora)"; break;
     case "airdrop": amounts.units = +(r() * 900 + 20).toFixed(2); amounts.wallets = Math.floor(r() * 400 + 18); note = "Pro-rata airdrop to $FIX6900 holders"; break;
     case "buyback": amounts.sol = +(r() * 2).toFixed(3); amounts.coin = Math.floor(r() * 900_000); note = "Bought $FIX6900 with fee proceeds"; break;
     case "burn": amounts.coin = Math.floor(r() * 900_000); note = "SPL burn of $FIX6900"; break;

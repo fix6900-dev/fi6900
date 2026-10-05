@@ -58,14 +58,14 @@ export function FlywheelView() {
   const airdropAt = data?.next.airdropAt ?? null;
   const notes: Note[] = [
     { label: "Creator fees claimed by the keeper from pump.fun and PumpSwap", source: "keeper ledger, tx signatures in the event feed" },
-    { label: "Liquidity added to the FI6900/SOL pool", source: "keeper ledger" },
+    { label: "Liquidity added to the FIX6900 Index/SOL pool", source: "keeper ledger" },
     { label: "FIX6900 units minted from fee SOL and airdropped to $FIX6900 holders", source: "keeper ledger" },
     { label: "$FIX6900 bought with 75% of index fees and burned", source: "keeper ledger" },
   ];
 
   return (
     <div className="page pagebody">
-      <PageHeader eyebrow="Flywheel" title="The coin funds the index. The index burns the coin." desc="$FIX6900 creator fees are split. Half becomes permanent FI6900/SOL liquidity. Half buys the basket, mints units and airdrops them to $FIX6900 holders every 15 minutes. 75% of the index's own fees buy back and burn $FIX6900." />
+      <PageHeader eyebrow="Flywheel" title="The coin funds the index. The index burns the coin." desc="$FIX6900 creator fees are split. Half becomes permanent FIX6900 Index/SOL liquidity. Half buys the basket, mints units and airdrops them to $FIX6900 holders every 15 minutes. 75% of the index's own fees buy back and burn $FIX6900." />
 
       <section className="sec" aria-label="Fee flow">
         <div className="fw-big">
